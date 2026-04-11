@@ -59,6 +59,33 @@ async function processPDF(file) {
     // Vorverarbeitung: Kapitälchen-Buchstabenabstand rekonstruieren («W O L F G A N G» → «WOLFGANG»)
     const processedText = preprocessPDFText(fullText);
     const detected = detectSource(processedText, filename);
+
+    // ── KI-Fallback: nur wenn regelbasierte Erkennung versagt hat ──
+    // «monographie» bedeutet: kein bekanntes Muster erkannt → KI nachfragen
+    if (detected.type === 'monographie' && typeof applyAIFallback === 'function') {
+      showPdfStatus('loading', '✨ KI analysiert die Quelle…');
+      const aiData = await applyAIFallback(processedText, filename);
+      if (aiData && aiData.type && aiData.type !== 'monographie') {
+        // KI hat einen konkreten Typ erkannt → KI-Ergebnis verwenden
+        await applyDetectedInfo({ type: aiData.type, fields: {
+          nachnamen_raw: aiData.nachnamen || [],
+          vornamen_raw:  aiData.vornamen  || [],
+          titel:         aiData.titel     || '',
+          jahr:          aiData.jahr      || '',
+          orte:          aiData.ort       || '',
+          auflage:       aiData.auflage   || '',
+          zeitschrift:   aiData.zeitschrift || '',
+          seite_start:   aiData.seite_start || '',
+          band:          aiData.band      || '',
+          teil:          aiData.teil      || '',
+          seite:         aiData.seite     || '',
+        }}, processedText);
+        showPdfStatus('success', '✨ Quelle von KI erkannt. Bitte kurz prüfen.');
+        return;
+      }
+      // KI hat auch nur monographie → normale Ausgabe
+    }
+
     await applyDetectedInfo(detected, processedText);
 
   } catch (err) {
