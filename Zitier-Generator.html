@@ -155,6 +155,22 @@
             <div class="workspace-note workspace-lead-note" style="margin-bottom:16px">
               <strong>1.</strong> PDF hochladen · <strong>2.</strong> kurz prüfen · <strong>3.</strong> Vollzitat übernehmen
             </div>
+            <!-- ── KI Freitext-Parser ───────────────────────────────────── -->
+            <div class="ai-parse-section" id="aiParseSection">
+              <div class="ai-parse-header">
+                <span class="ai-parse-title">✨ Quelle per Text einfügen</span>
+                <span class="ai-parse-sub">Quellenangabe aus Fussnote, Literaturverzeichnis oder E-Mail einfügen — KI füllt die Felder aus</span>
+              </div>
+              <div class="ai-parse-body">
+                <textarea id="aiParseInput" class="ai-parse-textarea" placeholder="z.B. «Portmann, Das Arbeitsrecht in der Schweiz, 3. Aufl., Bern 2019, S. 45» oder «BGE 140 III 450» oder «AJP 2020 S. 739»"></textarea>
+                <button class="ai-parse-btn" onclick="runAIParse()" id="aiParseBtn">
+                  <span class="ai-parse-btn-icon">✨</span>
+                  <span id="aiParseBtnLabel">Felder automatisch ausfüllen</span>
+                </button>
+              </div>
+              <div class="ai-parse-status" id="aiParseStatus"></div>
+            </div>
+
             <!-- ── PDF Recognition ──────────────────────────────────────── -->
             <div class="pdf-section" id="pdfSection"
                  ondragover="handleDragOver(event)"
@@ -823,5 +839,97 @@
 <script src="./checker-ui.js"></script>
 <script src="./tracker.js"></script>
 <script src="./hero-demo.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════════
+//  KI Freitext-Parser
+//  Schickt Freitext an Supabase Edge Function → Claude Haiku
+//  → füllt Formularfelder automatisch aus
+// ══════════════════════════════════════════════════════════════
+const AI_FUNCTION_URL = 'https://nbfkhieeltektzrsnzlm.supabase.co/functions/v1/rapid-function';
+
+async function runAIParse() {
+  const input = document.getElementById('aiParseInput').value.trim();
+  if (!input) {
+    showAIStatus('error', 'Bitte zuerst eine Quellenangabe eingeben.');
+    return;
+  }
+
+  const btn   = document.getElementById('aiParseBtn');
+  const label = document.getElementById('aiParseBtnLabel');
+  btn.disabled = true;
+  label.textContent = 'Wird analysiert…';
+  showAIStatus('loading', '✨ KI analysiert die Quelle…');
+
+  try {
+    const resp = await fetch(AI_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: input }),
+    });
+
+    if (!resp.ok) throw new Error(`Server Fehler: ${resp.status}`);
+    const data = await resp.json();
+
+    // Falls die KI JSON in ```json ... ``` verpackt zurückgibt, roh parsen
+    if (data.error && data.raw) {
+      const cleaned = data.raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/,'').trim();
+      try { Object.assign(data, JSON.parse(cleaned)); delete data.error; } catch {}
+    }
+    if (data.error) throw new Error(data.error);
+
+    // Quellentyp setzen
+    if (data.type) {
+      const sel = document.getElementById('sourceType');
+      if (sel) { sel.value = data.type; renderForm(); }
+      await new Promise(r => setTimeout(r, 80));
+    }
+
+    // Felder befüllen
+    const map = {
+      // Autor
+      'nachnamen_0':   data.nachnamen?.[0] || '',
+      'vornamen_0':    data.vornamen?.[0]  || '',
+      'nachnamen_1':   data.nachnamen?.[1] || '',
+      'vornamen_1':    data.vornamen?.[1]  || '',
+      // Werk
+      'titel':         data.titel   || '',
+      'jahr':          data.jahr    || '',
+      'orte':          data.ort     || '',
+      'auflage':       data.auflage || '',
+      // Zeitschrift
+      'zeitschrift':   data.zeitschrift || '',
+      'seite_start':   data.seite_start || '',
+      // BGE
+      'band':          data.band  || '',
+      'teil':          data.teil  || '',
+      'seite':         data.seite || '',
+    };
+
+    let filled = 0;
+    for (const [id, val] of Object.entries(map)) {
+      if (!val) continue;
+      const el = document.getElementById(id);
+      if (el) { el.value = val; el.classList.add('ai-filled'); filled++; }
+    }
+
+    showAIStatus('success', `✅ ${filled} Felder ausgefüllt. Bitte kurz prüfen.`);
+    document.getElementById('autofillLegend')?.classList.add('visible');
+
+  } catch (err) {
+    showAIStatus('error', `Fehler: ${err.message}. Bitte Felder manuell ausfüllen.`);
+  } finally {
+    btn.disabled = false;
+    label.textContent = 'Felder automatisch ausfüllen';
+  }
+}
+
+function showAIStatus(type, msg) {
+  const el = document.getElementById('aiParseStatus');
+  if (!el) return;
+  el.className = `ai-parse-status ai-status-${type}`;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+</script>
 </body>
 </html>
