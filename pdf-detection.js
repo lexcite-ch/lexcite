@@ -999,6 +999,37 @@ async function applyDetectedInfo(detected, fullText) {
     Object.keys(extra).forEach(k => { if (!fields[k]) fields[k] = extra[k]; });
   }
 
+  // ── Ort-Lookup-Tabelle ──────────────────────────────────────
+  // Wenn Ort noch leer ist, aus Kommentarname / Verlag ableiten.
+  // Kommentare und Monographien haben einen bekannten Verlagsort.
+  if (!fields.orte) {
+    const kommName = (fields.komm_name || '').toLowerCase();
+    const textLow  = (fullText || '').toLowerCase();
+    const ORT_MAP  = [
+      // Kommentare nach Name
+      { rx: /basler kommentar|bsk\b/,           ort: 'Basel'   },
+      { rx: /berner kommentar/,                 ort: 'Bern'    },
+      { rx: /zürcher kommentar/,                ort: 'Zürich'  },
+      { rx: /orell.?füssli|ofk\b/,              ort: 'Zürich'  },
+      { rx: /stämpflis? handkommentar|shk\b/,   ort: 'Bern'    },
+      { rx: /kurzkommentar|kuko\b/,             ort: 'Basel'   },
+      // Verlage im Volltext
+      { rx: /schulthess/,                       ort: 'Zürich'  },
+      { rx: /helbing.?licht/,                   ort: 'Basel'   },
+      { rx: /stämpfli verlag/,                  ort: 'Bern'    },
+      { rx: /dike verlag/,                      ort: 'Zürich'  },
+      { rx: /hel\s*bing\s*licht/,                 ort: 'Basel'   },
+      { rx: /\bnomos\b/,                        ort: 'Baden-Baden' },
+      { rx: /c\.h\.beck|verlag beck/,           ort: 'München' },
+    ];
+    for (const { rx, ort } of ORT_MAP) {
+      if (rx.test(kommName) || rx.test(textLow)) {
+        fields.orte = ort;
+        break;
+      }
+    }
+  }
+
   // Apply to form fields
   for (const key of (fieldMap[type] || [])) {
     const val = fields[key];
