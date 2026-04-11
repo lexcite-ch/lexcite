@@ -459,6 +459,61 @@ function detectSource(text, filename) {
   }
 
   // ──────────────────────────────────────────────────────────────
+  //  STUFE 2 PRE-CHECK: Dike/Legalis «Buchautoren»-Block
+  //  Muss VOR Kommentar-Erkennung laufen — sonst triggern Kommentar-
+  //  Schlüsselwörter im Volltext (Fussnoten) die falsche Erkennung.
+  //  Erkennungsmerkmal: «Buchautoren» im Kopf (erste 900 Zeichen)
+  // ──────────────────────────────────────────────────────────────
+  {
+    const preHead = t.substring(0, 900);
+    if (/\bBuchautoren?\s+/i.test(preHead)) {
+      // Direkt zu STUFE 4a weitergehen — dort wird der Block vollständig geparst
+      // (Trick: wir setzen ein Flag und lassen den Code unten laufen)
+      // Einfacher: inline parsen da wir schon wissen es ist ein Sammelband
+      const dikeTitelM   = preHead.match(/\bTitel\s+(.+?)(?=\s*(?:Serie\/Reihe|Buchautoren|Jahr|Herausgeber|ISBN))/i);
+      const dikeSerieM   = preHead.match(/\bSerie\/Reihe\s+(.+?)(?=\s*(?:Band\/Nr\.|Buchautoren|Jahr|Seiten|Herausgeber|ISBN|Verlag|$))/i);
+      const dikeBuchAutM = preHead.match(/\bBuchautoren?\s+(.+?)(?=\s*(?:Jahr|Seiten|Herausgeber|ISBN|Verlag|$))/i);
+      const dikeHrsgM    = preHead.match(/\bHerausgeber\s+(.+?)(?=\s*(?:ISBN|Verlag|Seiten|\d{3,}-|$))/i);
+      const dikeJahrM    = preHead.match(/\bJahr\s+(\d{4})/i);
+      const dikeSeitenM  = preHead.match(/\bSeiten\s+(\d+)/i);
+      const dikeVerlagM  = preHead.match(/\bVerlag\s+([^\n]+)/i);
+
+      const autorRaw   = dikeBuchAutM ? dikeBuchAutM[1].trim() : '';
+      const autorParts = autorRaw.split(/\s+/).filter(Boolean);
+      const nachnamen_raw = autorParts.length >= 2 ? [autorParts[autorParts.length-1]] : (autorRaw ? [autorRaw] : []);
+      const vornamen_raw  = autorParts.length >= 2 ? [autorParts.slice(0,-1).join(' ')] : [''];
+
+      const beitragTitel = dikeTitelM ? dikeTitelM[1].trim() : '';
+      const sbTitel      = dikeSerieM ? dikeSerieM[1].trim() : '';
+      const verlagRaw    = dikeVerlagM ? dikeVerlagM[1].trim() : '';
+      const verlagOrtMap = { 'dike':'Zürich','schulthess':'Zürich','hel bing':'Basel','helbing':'Basel','stämpfli':'Bern','nomos':'Baden-Baden','beck':'München' };
+      const ortKey       = Object.keys(verlagOrtMap).find(k => verlagRaw.toLowerCase().includes(k));
+      const orte         = ortKey ? verlagOrtMap[ortKey] : '';
+
+      const hrsg_raw = [];
+      if (dikeHrsgM) {
+        dikeHrsgM[1].trim().split(/,\s*/).forEach(p => {
+          const pp = p.trim().split(/\s+/);
+          if (pp.length >= 2) hrsg_raw.push(pp[pp.length-1] + ' ' + pp.slice(0,-1).join(' '));
+          else if (pp.length === 1) hrsg_raw.push(pp[0]);
+        });
+      }
+
+      return { type: 'sammelband', fields: {
+        titel:       beitragTitel,
+        sb_titel:    sbTitel,
+        auflage:     '',
+        orte,
+        jahr:        dikeJahrM   ? dikeJahrM[1]   : '',
+        seite_start: dikeSeitenM ? dikeSeitenM[1]  : '',
+        nachnamen_raw,
+        vornamen_raw,
+        hrsg_raw,
+      }};
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
   //  STUFE 2a: Navigator.ch / OFK (Orell Füssli Kommentar)
   //  Erkennungsmerkmal: «Artikelkommentar [LAW] [ARTNR]» in Kopf
   //  oder «Reihe OFK – Orell Füssli Kommentar»
