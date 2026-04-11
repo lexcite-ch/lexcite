@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LexCite – Zitier-Generator für Schweizer Recht</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Source+Serif+4:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="container">
+  <header>
+    <button class="dark-toggle" id="darkToggle" onclick="toggleDark()" title="Dark Mode">🌙</button>
+    <div class="header-inner">
+      <div class="header-main">
+        <div class="header-badge">⚖️ Schweizer Recht · ZitierGuide Müller 5. Aufl.</div>
+        <h1>LexCite</h1>
+        <p>Guide-nahe Zitierhilfe für juristische Arbeiten in der Schweiz. Gemacht für Vollzitate, Verzeichnisse und weniger Abgabestress.</p>
+      </div>
+      <div class="hero-panel">
+        <div class="hero-eyebrow">Schweizer Studienalltag · Guide-nah</div>
+        <div class="hero-title">Entscheid rein. Vollzitat sauber raus.</div>
+        <div class="hero-copy">
+          Bei Entscheiden frisst nicht die Fussnote Zeit, sondern das vollständige Werkzitat. LexCite bereitet Geschäftsnummer, Datum und Verzeichniseintrag direkt vor.
+        </div>
+        <div class="hero-demo" id="heroDemo" data-step="0" aria-label="Kurze Produktvorschau">
+          <div class="hero-demo-head">
+            <div class="hero-demo-title">So funktioniert's</div>
+            <div class="hero-demo-status">vom PDF zum Verzeichniseintrag</div>
+          </div>
+          <div class="hero-demo-intro">Ein klarer Ablauf: hochladen, kurz prüfen, Vollzitat übernehmen, speichern.</div>
+          <div class="hero-demo-steps">
+            <span class="hero-demo-step active">1. PDF hochladen</span>
+            <span class="hero-demo-step">2. Angaben prüfen</span>
+            <span class="hero-demo-step">3. Vollzitat kopieren</span>
+            <span class="hero-demo-step">4. Im Verzeichnis speichern</span>
+          </div>
+          <div class="hero-demo-caption" id="heroDemoCaption">
+            <strong>PDF hochladen</strong>
+            <span>Zieh einen BGer- oder BGE-Entscheid hinein. LexCite erkennt Geschäftsnummer und Datum direkt aus dem Dokument.</span>
+          </div>
+          <div class="hero-demo-progress" aria-hidden="true">
+            <span class="hero-demo-progress-bar" id="heroDemoProgress"></span>
+          </div>
+          <div class="hero-demo-canvas">
+            <div class="hero-demo-scene hero-demo-scene-upload">
+              <div class="hero-demo-scene-meta">
+                <span class="hero-demo-scene-pill hero-demo-scene-pill-ok">BGer erkannt</span>
+                <span class="hero-demo-scene-note">lokal verarbeitet</span>
+              </div>
+              <div class="hero-demo-file">
+                <span class="hero-demo-file-icon">📄</span>
+                <div>
+                  <strong>BGer 9C_355_2023.pdf</strong>
+                  <span>LexCite liest Datum und Geschäftsnummer direkt aus</span>
+                </div>
+              </div>
+            </div>
+            <div class="hero-demo-scene hero-demo-scene-fields">
+              <div class="hero-demo-scene-meta">
+                <span class="hero-demo-scene-pill">Autofill aktiv</span>
+                <span class="hero-demo-scene-note">1 Feld kurz prüfen</span>
+              </div>
+              <div class="hero-demo-field-group">
+                <div class="hero-demo-field">
+                  <label>Quellentyp</label>
+                  <strong>BGer (nicht amtlich publiziert)</strong>
+                </div>
+                <div class="hero-demo-field">
+                  <label>Geschäftsnummer</label>
+                  <strong>9C_355/2023</strong>
+                </div>
+                <div class="hero-demo-field">
+                  <label>Datum</label>
+                  <strong>07.09.2023</strong>
+                </div>
+              </div>
+            </div>
+            <div class="hero-demo-scene hero-demo-scene-output">
+              <div class="hero-demo-scene-meta">
+                <span class="hero-demo-scene-pill">Sauberes Vollzitat</span>
+                <span class="hero-demo-scene-note">direkt kopierbar</span>
+              </div>
+              <div class="hero-demo-output-label">Vollzitat</div>
+              <div class="hero-demo-output-text">BGer 9C_355/2023 vom 07.09.2023 E. 5.2.</div>
+            </div>
+            <div class="hero-demo-scene hero-demo-scene-save">
+              <div class="hero-demo-success">Im Judikaturverzeichnis gespeichert</div>
+              <div class="hero-demo-mini-note">Danach bleibt alles zusammen: Vollzitat, Kurzangabe und Verzeichniseintrag.</div>
+            </div>
+          </div>
+        </div>
+        <div class="hero-actions">
+          <button class="btn-check hero-cta-primary" onclick="switchPage('zitieren'); document.getElementById('pageNav').scrollIntoView({behavior:'smooth', block:'start'}); document.getElementById('pdfFileInput').click();">Entscheid-PDF hochladen</button>
+          <button class="btn-export hero-cta-secondary" onclick="switchPage('pruefen'); document.getElementById('pageNav').scrollIntoView({behavior:'smooth', block:'start'})">Bestehendes Zitat prüfen</button>
+        </div>
+        <div class="hero-proof-row">
+          <span>Besonders stark bei BGer, BGE und Kommentaren</span>
+          <span>Vollzitat und Verzeichniseintrag bleiben zusammen</span>
+        </div>
+        <div class="hero-microcopy">
+          Lokal im Browser · direkt testbar · gebaut für echte Arbeiten statt für Demo-Zitate
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════════════════════
+       PAGE NAVIGATION
+  ═══════════════════════════════════════════════════════════ -->
+  <nav class="page-nav" id="pageNav">
+    <div class="page-nav-tab active" id="nav-zitieren" onclick="switchPage('zitieren')">
+      <span class="tab-icon">✍️</span> Zitieren
+    </div>
+    <div class="page-nav-tab" id="nav-pruefen" onclick="switchPage('pruefen')">
+      <span class="tab-icon">🔍</span> Prüfen
+    </div>
+    <div class="page-nav-tab" id="nav-quellen" onclick="switchPage('quellen')">
+      <span class="tab-icon">📚</span> Quellen
+      <span class="page-nav-badge zero" id="navBadge">0</span>
+    </div>
+    <div class="page-nav-tab" id="nav-tracker" onclick="switchPage('tracker')">
+      <span class="tab-icon">📊</span> Tracker
+    </div>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════════════════
+       PAGE: ZITIEREN
+  ═══════════════════════════════════════════════════════════ -->
+  <div class="page-section active" id="page-zitieren">
+  <div class="card">
+    <section class="quickstart-strip">
+      <div class="quickstart-card quickstart-card-primary">
+        <strong>Schnellster Start</strong>
+        <span>Ein BGer- oder BGE-PDF hochladen. LexCite bereitet Geschäftsnummer, Datum und Verzeichniseintrag direkt vor.</span>
+      </div>
+      <div class="quickstart-card quickstart-card-secondary">
+        <strong>Heute am stärksten</strong>
+        <span>Entscheide und Kommentare. Für alles andere kannst du danach direkt den Quellentyp wählen.</span>
+      </div>
+    </section>
+
+      <div class="workspace-grid">
+      <div class="workspace-main">
+        <div class="workspace-panel">
+          <div class="workspace-panel-head">
+            <div class="workspace-panel-title">Arbeitsbereich</div>
+            <div class="workspace-panel-subtitle">Schnellster Start: BGer- oder BGE-PDF.</div>
+          </div>
+          <div class="workspace-panel-body">
+            <div class="workspace-note workspace-lead-note" style="margin-bottom:16px">
+              <strong>1.</strong> PDF hochladen · <strong>2.</strong> kurz prüfen · <strong>3.</strong> Vollzitat übernehmen
+            </div>
+            <!-- ── PDF Recognition ──────────────────────────────────────── -->
+            <div class="pdf-section" id="pdfSection"
+                 ondragover="handleDragOver(event)"
+                 ondragleave="handleDragLeave(event)"
+                 ondrop="handleDrop(event)">
+
+            <div class="pdf-section-header">
+                <span class="pdf-section-title">📄 Entscheid-PDF einlesen</span>
+                <span class="pdf-section-sub">Der schnellste Weg zu BGer- und BGE-Vollzitaten</span>
+              </div>
+
+              <div class="drop-area" onclick="document.getElementById('pdfFileInput').click()">
+                <div class="drop-icon">📂</div>
+                <div class="drop-text">
+                  PDF hier <strong>ablegen</strong> oder klicken zum Auswählen<br>
+                  <span style="font-size:0.88em">am stärksten bei BGer und BGE · Kommentare, Materialien und weitere Quellen folgen danach</span>
+                </div>
+                <button class="btn-file-select" onclick="event.stopPropagation(); document.getElementById('pdfFileInput').click()">
+                  PDF auswählen
+                </button>
+              </div>
+              <input type="file" id="pdfFileInput" accept=".pdf" onchange="handleFileSelect(event)">
+
+              <div class="pdf-status" id="pdfStatus"></div>
+            </div>
+
+            <div class="autofill-legend" id="autofillLegend">
+              🤖 <strong>Gelb markierte Felder</strong> wurden automatisch erkannt. Bitte kurz prüfen.
+            </div>
+
+            <!-- ── Source Type ──────────────────────────────────────────── -->
+            <div class="type-selector">
+              <div class="form-label">Quellentyp</div>
+              <select id="sourceType" onchange="onTypeChange()">
+                <option value="">— Bitte auswählen —</option>
+                <optgroup label="Literatur">
+                  <option value="monographie">Monographie / Lehrbuch (selbständiges Werk)</option>
+                  <option value="dissertation">Dissertation / Habilitation</option>
+                  <option value="zeitschrift">Zeitschriftenartikel (unselbständiges Werk)</option>
+                  <option value="sammelband">Beitrag in Sammelband (unselbständiges Werk)</option>
+                  <option value="kommentar">Kommentar</option>
+                </optgroup>
+                <optgroup label="Judikatur">
+                  <option value="bge">BGE (amtlich publiziert)</option>
+                  <option value="bger">BGer (nicht amtlich publiziert)</option>
+                  <option value="bvge">BVGE / BVGer (Bundesverwaltungsgericht)</option>
+                  <option value="kantonal">Kantonaler Entscheid</option>
+                </optgroup>
+                <optgroup label="Materialien">
+                  <option value="materialien">Botschaft / Bericht / Parlamentsmaterial</option>
+                </optgroup>
+                <optgroup label="Sonstiges">
+                  <option value="gesetz">Gesetz / Erlass (Abkürzungsverzeichnis)</option>
+                  <option value="internet">Internetfundstelle</option>
+                </optgroup>
+              </select>
+            </div>
+
+            <!-- ── Dynamic Form ─────────────────────────────────────────── -->
+            <div id="dynamicForm">
+              <div class="empty-state">
+                <div class="icon">📚</div>
+                <p>PDF hochladen oder einen Quellentyp auswählen, um direkt zu starten.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="workspace-sidebar">
+        <div class="workspace-panel workspace-guide-panel">
+          <div class="workspace-panel-head">
+            <div class="workspace-panel-title">Start-Hilfe</div>
+            <div class="workspace-panel-subtitle">So kommst du am schnellsten zum Ergebnis.</div>
+          </div>
+          <div class="workspace-panel-body">
+            <div class="workspace-guide-steps">
+              <div class="workspace-guide-step">
+                <strong>Mit Entscheid-PDF starten</strong>
+                <span>Der schnellste Weg für BGer und BGE. LexCite erkennt Geschäftsnummer und Datum direkt.</span>
+              </div>
+              <div class="workspace-guide-step">
+                <strong>Ohne PDF?</strong>
+                <span>Direkt unten den Quellentyp wählen. Das ist der beste Einstieg für Kommentare, Gesetze und Materialien.</span>
+              </div>
+              <div class="workspace-guide-step">
+                <strong>Zitat schon geschrieben?</strong>
+                <span>Dann lieber gleich in <em>Prüfen</em> wechseln und die bestehende Fassung kontrollieren.</span>
+              </div>
+            </div>
+            <div class="workspace-guide-actions">
+              <button class="workspace-guide-btn" type="button" onclick="document.getElementById('sourceType').focus()">Quellentyp wählen</button>
+              <button class="workspace-guide-btn workspace-guide-btn-secondary" type="button" onclick="switchPage('pruefen'); document.getElementById('pageNav').scrollIntoView({behavior:'smooth', block:'start'})">Zu Prüfen</button>
+            </div>
+          </div>
+        </div>
+        <!-- ── Output ───────────────────────────────────────────────── -->
+        <div id="outputSection" class="output-section workspace-panel">
+          <div class="workspace-panel-head">
+            <div class="workspace-panel-title">Ergebnis</div>
+            <div class="workspace-panel-subtitle">Direkt kopieren oder im passenden Verzeichnis sichern.</div>
+          </div>
+          <div class="workspace-panel-body">
+            <div class="output-block">
+              <div class="output-block-label" id="vollLabel">📖 Vollzitat — Literaturverzeichniseintrag</div>
+              <div class="citation-display" id="vollOutput"></div>
+              <button class="btn-copy" onclick="copyText('vollPlain', this)">📋 Kopieren</button>
+              <span id="vollPlain" style="display:none"></span>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label" id="kurzLabel">🔖 Kurzangabe — Fussnote</div>
+              <div class="citation-display" id="kurzOutput"></div>
+              <button class="btn-copy" onclick="copyText('kurzPlain', this)">📋 Kopieren</button>
+              <span id="kurzPlain" style="display:none"></span>
+            </div>
+            <div class="hint">
+              ⚠️ <strong>Kapitälchen:</strong> Autorennamen müssen in Word manuell als <strong>Kapitälchen</strong> formatiert werden (Format → Zeichen → Kapitälchen).
+            </div>
+            <button class="btn-save-citation" id="btnSaveCitation" onclick="saveCurrentCitation()">
+              💾 In Verzeichnis speichern
+            </button>
+          </div>
+        </div>
+        <div class="workspace-panel pricing-survey-card workspace-panel-secondary" id="pricingSurveyCard" style="display:none">
+          <div class="workspace-panel-head">
+            <div class="workspace-panel-title">Semesterpass</div>
+            <div class="workspace-panel-subtitle">Kurzes Produktsignal nach echter Nutzung.</div>
+          </div>
+          <div class="workspace-panel-body">
+            <div class="pricing-survey-intro" id="pricingSurveyIntro">
+              Nach ein paar echten Schritten im Tool: Welcher Semesterpass wäre für dich für LexCite noch realistisch?
+            </div>
+            <div class="pricing-pass-mini">
+              <span class="pricing-pass-mini-chip">Testzugang: einzelne Fälle</span>
+              <span class="pricing-pass-mini-chip premium">Semesterpass: speichern, prüfen, mehrere Arbeiten</span>
+            </div>
+            <div class="pricing-survey-actions" id="pricingSurveyActions">
+              <button class="pricing-survey-btn" onclick="LexCitePricingSurvey.answer('3')">3 CHF / Semester</button>
+              <button class="pricing-survey-btn" onclick="LexCitePricingSurvey.answer('5')">5 CHF / Semester</button>
+              <button class="pricing-survey-btn" onclick="LexCitePricingSurvey.answer('9')">9 CHF / Semester</button>
+              <button class="pricing-survey-btn" onclick="LexCitePricingSurvey.answer('19')">19 CHF / Semester</button>
+            </div>
+            <div class="pricing-survey-result" id="pricingSurveyResult" style="display:none"></div>
+            <div class="pricing-survey-footer">
+              Die Frage erscheint erst nach echter Nutzung, damit das Signal näher an einer realen Kaufentscheidung liegt.
+              <button class="pricing-survey-dismiss" type="button" onclick="LexCitePricingSurvey.dismiss()">Jetzt nicht</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /card -->
+  </div><!-- /page-zitieren -->
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     PAGE: PRÜFEN
+════════════════════════════════════════════════════════════════ -->
+<div class="page-section" id="page-pruefen">
+  <div class="card">
+    <div class="page-section-header">
+      <div class="page-section-title">🔍 Zitat prüfen</div>
+      <p class="page-section-desc">
+        Füge zuerst ein einzelnes Zitat ein. LexCite erkennt den Typ, zeigt typische Guide-Fehler und schlägt wenn möglich eine sauberere Fassung vor.
+      </p>
+    </div>
+    <textarea class="checker-input-area" id="checkerInput"
+      placeholder="Zitat hier einfügen, z.B.:&#10;BGE 141 III 569&#10;oder: Portmann Wolfgang, Individualarbeitsrecht, 2020, S. 45"></textarea>
+    <div class="checker-controls-row checker-controls-row-labeled">
+      <label class="checker-control">
+        <span class="checker-control-label">Quellentyp</span>
+        <select id="checkerTypeSelect">
+          <option value="auto">🔎 Typ auto-erkennen</option>
+          <option value="bge">BGE</option>
+          <option value="bger">BGer</option>
+          <option value="bvge">BVGE / BVGer</option>
+          <option value="kantonal">Kantonal</option>
+          <option value="monographie">Monographie</option>
+          <option value="dissertation">Dissertation / Habilitation</option>
+          <option value="zeitschrift">Zeitschrift</option>
+          <option value="kommentar">Kommentar</option>
+          <option value="sammelband">Sammelband</option>
+          <option value="materialien">Materialien</option>
+          <option value="gesetz">Gesetz / Erlass</option>
+          <option value="internet">Internet</option>
+        </select>
+      </label>
+      <label class="checker-control">
+        <span class="checker-control-label">Zielausgabe</span>
+        <select id="checkerFormatSelect">
+          <option value="voll">Vollzitat (1. Nennung)</option>
+          <option value="kurz">Kurzangabe (Folgenennung)</option>
+          <option value="verz">Verzeichniseintrag</option>
+        </select>
+      </label>
+      <button class="btn-check" onclick="checkCitation()">Prüfen →</button>
+    </div>
+    <div class="checker-result" id="checkerResult"></div>
+    <details class="advanced-tools">
+      <summary class="advanced-tools-summary">
+        <div>
+          <div class="advanced-tools-kicker">Fortgeschritten</div>
+          <div class="advanced-tools-title">Mehrere Fussnoten, Referenzfälle und interne Tests</div>
+          <div class="advanced-tools-copy">Für Korrekturläufe, Referenzsuiten und Founder-Checks. Nicht der empfohlene erste Einstieg.</div>
+        </div>
+      </summary>
+      <div class="advanced-tools-body">
+        <div class="bulk-checker-panel">
+          <div class="bulk-checker-head">
+            <div>
+              <div class="bulk-checker-title title-with-info">✏️ Fussnoten-Korrekturmodus <button type="button" class="info-tip" aria-label="Erklärung zum Fussnoten-Korrekturmodus" aria-expanded="false" onclick="toggleInfoTip(this)">i</button></div>
+              <div class="info-inline">Hier kannst du mehrere bereits geschriebene Fussnoten aus deiner Arbeit einfügen. LexCite prüft jede Zeile einzeln, erkennt den Typ, markiert mögliche Guide-Probleme und zeigt wenn möglich eine bessere Fassung.</div>
+              <div class="bulk-checker-sub">Füge mehrere bestehende Fussnoten ein. LexCite analysiert sie zeilenweise und schlägt wenn möglich eine sauberere Fassung vor.</div>
+            </div>
+            <div class="bulk-checker-actions">
+              <button class="checker-ref-btn" onclick="loadBulkCheckerExample()">Beispiel laden</button>
+              <button class="checker-ref-btn" onclick="clearBulkChecker()">Leeren</button>
+              <button class="btn-check" onclick="runBulkFootnoteCheck()">Mehrere prüfen →</button>
+            </div>
+          </div>
+          <textarea class="checker-input-area" id="bulkCheckerInput" placeholder="Mehrere Fussnoten einfügen, z.B.:&#10;1. BGer 9C_355/2023 vom 07.09.2023&#10;2. KOLLER Alfred, Schweizerisches Obligationenrecht, Bern 2017, S. 44&#10;3. Botschaft ..., BBl 2009 S. 5975 ff."></textarea>
+          <div class="bulk-checker-toolbar">
+            <button class="checker-ref-btn" id="bulkCopyBtn" onclick="copyBulkCheckerResults()" disabled>Korrigierte Fassung kopieren</button>
+            <button class="checker-ref-btn" id="bulkApplyBtn" onclick="applyBulkCheckerResults()" disabled>Korrigierte Fassung ins Feld übernehmen</button>
+          </div>
+          <div class="bulk-checker-result" id="bulkCheckerResult"></div>
+        </div>
+        <div class="checker-reference-panel checker-reference-panel-internal">
+          <div class="checker-reference-head">
+            <div>
+              <div class="checker-reference-kicker">Intern / Referenzfälle</div>
+              <div class="checker-reference-title">Guide-Referenzfälle und Negativtests</div>
+            </div>
+            <div class="checker-reference-actions">
+              <button class="checker-ref-btn" onclick="runReferenceSuite()">Referenztest ausführen</button>
+              <button class="checker-ref-btn" onclick="runNegativeSuite()">Negativtest ausführen</button>
+            </div>
+          </div>
+          <div class="checker-reference-sub">
+            Echte Beispielzitate aus dem ZitierGuide plus Gegenbeispiele. Gut für Regressionen und interne Qualitätssicherung, nicht für den ersten Nutzerklick.
+          </div>
+          <div class="checker-ref-grid" id="checkerReferenceGrid"></div>
+          <div class="checker-reference-status" id="checkerReferenceStatus"></div>
+        </div>
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     PAGE: QUELLEN
+════════════════════════════════════════════════════════════════ -->
+<div class="page-section" id="page-quellen">
+  <div class="quellen-card">
+    <div class="quellen-card-inner" style="padding-bottom:0">
+      <div class="project-panel">
+        <div class="project-panel-head">
+          <div>
+            <div class="project-panel-title title-with-info">🗂️ Projektmodus <button type="button" class="info-tip" aria-label="Erklärung zum Projektmodus" aria-expanded="false" onclick="toggleInfoTip(this)">i</button></div>
+            <div class="info-inline">Der Projektmodus hält deine aktuelle Arbeit zusammen: Titel, Modul, Abgabedatum und Notizen. So wird aus losen Zitaten ein echter Arbeitskontext für Seminar-, Projekt- oder Abschlussarbeiten.</div>
+            <div class="project-panel-sub">Halte jede Seminar-, Projekt- oder Abschlussarbeit als eigenes Arbeitskontext fest. Das ist die Basis für einen späteren echten Produkt-Workflow mit Projekten statt losem Zitieren.</div>
+          </div>
+        </div>
+        <div class="project-grid">
+          <div class="form-group">
+            <label class="form-label" for="projectTitle">Projekt / Arbeit</label>
+            <input type="text" id="projectTitle" placeholder="z.B. Seminararbeit Arbeitsrecht" oninput="updateProjectStatus(false)">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="projectCourse">Modul / Kurs</label>
+            <input type="text" id="projectCourse" placeholder="z.B. Moot Court oder ZPO" oninput="updateProjectStatus(false)">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="projectDueDate">Abgabedatum</label>
+            <input type="date" id="projectDueDate" oninput="updateProjectStatus(false)">
+          </div>
+        </div>
+        <div class="project-note-wrap">
+          <label class="form-label" for="projectNotes">Projekt-Notizen</label>
+          <textarea class="checker-input-area" id="projectNotes" placeholder="z.B. Fokus auf BGer, Materialien und OR-Kommentar. Noch Einleitung und Literaturverzeichnis prüfen." style="min-height:88px" oninput="updateProjectStatus(false)"></textarea>
+        </div>
+        <div class="project-meta-row">
+          <div class="project-deadline-chip" id="projectDeadlineChip">Noch kein Abgabedatum gesetzt</div>
+        </div>
+        <div class="project-save-row">
+          <div class="project-status" id="projectStatus">Noch keine Projektdaten gespeichert.</div>
+          <button class="btn-check" onclick="saveProjectMeta()">Projekt speichern</button>
+        </div>
+      </div>
+
+      <details class="utility-details">
+        <summary class="utility-summary">
+          <div>
+            <div class="utility-kicker">Fortgeschritten</div>
+            <div class="utility-title">🧭 Konsistenz-Check</div>
+            <div class="utility-copy">Dubletten, fehlende Details und Inkonsistenzen in gespeicherten Quellen prüfen.</div>
+          </div>
+        </summary>
+        <div class="utility-details-body">
+          <div class="consistency-panel utility-panel-slim">
+            <div class="consistency-panel-head">
+              <div>
+                <div class="consistency-panel-title title-with-info">🧭 Konsistenz-Check <button type="button" class="info-tip" aria-label="Erklärung zum Konsistenz-Check" aria-expanded="false" onclick="toggleInfoTip(this)">i</button></div>
+                <div class="info-inline">Dieser Bereich prüft deine bereits gespeicherten Quellen auf typische Schwachstellen wie doppelte Einträge, fehlende Erwägungen, fehlende Stichwörter oder allgemein unsichere Einträge. Das ist der Schritt von einem Generator hin zu einem echten Abgabe-Sicherheits-Tool.</div>
+                <div class="consistency-panel-sub">Prüft die bereits gespeicherten Quellen auf typische Inkonsistenzen, doppelte Einträge und fehlende Details.</div>
+              </div>
+              <div class="consistency-actions">
+                <button class="btn-check" onclick="runConsistencyAudit()">Konsistenz prüfen →</button>
+              </div>
+            </div>
+            <div class="consistency-result" id="consistencyResult"></div>
+          </div>
+        </div>
+      </details>
+    </div>
+    <details class="utility-details utility-details-after">
+      <summary class="utility-summary">
+        <div>
+          <div class="utility-kicker">Utility</div>
+          <div class="utility-title">🛡️ Backup & Import</div>
+          <div class="utility-copy">Quellen, Abkürzungen, Tracker und Projektdaten als JSON sichern oder wieder einspielen.</div>
+        </div>
+      </summary>
+      <div class="utility-details-body">
+        <div class="backup-panel utility-panel-slim">
+          <div class="backup-panel-head">
+            <div>
+              <div class="backup-panel-title title-with-info">🛡️ LexCite-Backup <button type="button" class="info-tip" aria-label="Erklärung zum Backup" aria-expanded="false" onclick="toggleInfoTip(this)">i</button></div>
+              <div class="info-inline">Mit dem Backup sicherst du Quellen, Abkürzungen, Tracker und Projektdaten als JSON-Datei. Das schützt dich vor Datenverlust durch Browser-Reset, Gerätewechsel oder versehentliches Löschen.</div>
+            </div>
+            <div class="backup-actions">
+              <button class="btn-export primary-export" onclick="exportWorkspaceBackup()">⬇️ Backup exportieren</button>
+              <button class="btn-export" onclick="openBackupImport('merge')">📥 Importieren & zusammenführen</button>
+              <button class="btn-export" onclick="openBackupImport('replace')" style="color:var(--danger)">♻️ Importieren & ersetzen</button>
+            </div>
+          </div>
+          <div class="backup-panel-sub">
+            Sichert deine gespeicherten Quellen, eigenen Abkürzungen und Tracker-Daten als JSON-Datei.
+          </div>
+          <div class="backup-status" id="backupStatus"></div>
+          <input type="file" id="backupFileInput" accept=".json,application/json" style="display:none" onchange="handleBackupImport(event)">
+        </div>
+      </div>
+    </details>
+    <!-- Tab bar -->
+    <div class="sources-tabs">
+      <button class="sources-tab active" id="tabLit"    onclick="switchTab('lit')">📖 Literaturverzeichnis</button>
+      <button class="sources-tab"        id="tabJud"    onclick="switchTab('jud')">⚖️ Judikaturverzeichnis</button>
+      <button class="sources-tab"        id="tabMat"    onclick="switchTab('mat')">🧾 Materialienverzeichnis</button>
+      <button class="sources-tab"        id="tabAbkurz" onclick="switchTab('abkurz')">🔤 Abkürzungen</button>
+    </div>
+
+    <div class="quellen-card-inner">
+      <!-- Tab: Literaturverzeichnis -->
+      <div id="tabLitBody">
+        <div class="sources-search-wrap">
+          <span class="sources-search-icon">🔍</span>
+          <input type="text" class="sources-search" id="litSearch" placeholder="Literatur suchen…" oninput="renderCitationList('lit')">
+        </div>
+        <div id="litCitationsList"></div>
+        <div class="export-bar" id="litExportBar" style="display:none">
+          <button class="btn-export primary-export" onclick="exportList('lit')">⬇️ Als .docx herunterladen</button>
+          <button class="btn-export" onclick="copyList('lit')">📋 Alle kopieren</button>
+          <button class="btn-export" onclick="clearList('lit')" style="color:var(--danger)">🗑 Löschen</button>
+        </div>
+      </div>
+
+      <!-- Tab: Judikaturverzeichnis -->
+      <div id="tabJudBody" style="display:none">
+        <div class="sources-search-wrap">
+          <span class="sources-search-icon">🔍</span>
+          <input type="text" class="sources-search" id="judSearch" placeholder="Entscheid suchen…" oninput="renderCitationList('jud')">
+        </div>
+        <div id="judCitationsList"></div>
+        <div class="export-bar" id="judExportBar" style="display:none">
+          <button class="btn-export primary-export" onclick="exportList('jud')">⬇️ Als .docx herunterladen</button>
+          <button class="btn-export" onclick="copyList('jud')">📋 Alle kopieren</button>
+          <button class="btn-export" onclick="clearList('jud')" style="color:var(--danger)">🗑 Löschen</button>
+        </div>
+      </div>
+
+      <!-- Tab: Materialienverzeichnis -->
+      <div id="tabMatBody" style="display:none">
+        <div class="sources-search-wrap">
+          <span class="sources-search-icon">🔍</span>
+          <input type="text" class="sources-search" id="matSearch" placeholder="Materialien suchen…" oninput="renderCitationList('mat')">
+        </div>
+        <div id="matCitationsList"></div>
+        <div class="export-bar" id="matExportBar" style="display:none">
+          <button class="btn-export primary-export" onclick="exportList('mat')">⬇️ Als .docx herunterladen</button>
+          <button class="btn-export" onclick="copyList('mat')">📋 Alle kopieren</button>
+          <button class="btn-export" onclick="clearList('mat')" style="color:var(--danger)">🗑 Löschen</button>
+        </div>
+      </div>
+
+      <!-- Tab: Abkürzungen -->
+      <div id="tabAbkurzBody" style="display:none">
+        <!-- Manual add -->
+        <div class="abbr-add-row">
+          <input type="text" id="customAbbrKey" class="abbr-add-input abbr-key-input" placeholder="Abk. (z.B. KG)">
+          <input type="text" id="customAbbrVal" class="abbr-add-input abbr-val-input" placeholder="Vollständige Bezeichnung, SR …">
+          <button class="abbr-add-btn" onclick="addCustomAbbr()">+ Hinzufügen</button>
+        </div>
+        <div class="abbr-list" id="abbrList"></div>
+        <div class="sources-empty-state" id="abbrEmpty" style="display:none">
+          Speichere Zitate — erkannte Abkürzungen erscheinen hier automatisch.<br>
+          <span style="font-size:0.9em;opacity:.7">Du kannst auch Gesetze manuell oben hinzufügen.</span>
+        </div>
+        <div class="export-bar" id="abbrExportBar" style="display:none">
+          <button class="btn-export primary-export" onclick="exportAbbrList()">⬇️ Als .txt herunterladen</button>
+          <button class="btn-export" onclick="copyAbbrList()">📋 Kopieren</button>
+        </div>
+      </div>
+    </div><!-- /quellen-card-inner -->
+  </div><!-- /quellen-card -->
+</div><!-- /page-quellen -->
+
+<!-- ══════════════════════════════════════════════════════════════
+     PAGE: TRACKER
+════════════════════════════════════════════════════════════════ -->
+<div class="page-section" id="page-tracker">
+  <div class="tracker-page-card" id="trackerWrap">
+    <div class="tracker-header-row">
+      <div class="tracker-title">📊 Quellentracker</div>
+      <div class="tracker-goal-row">
+        <span class="tracker-goal-label">Ziel:</span>
+        <input type="number" id="goalInput" class="tracker-goal-input" value="10" min="1" max="200" oninput="updateTrackerDisplay()">
+        <span class="tracker-goal-label">Quellen</span>
+      </div>
+      <button class="tracker-reset" onclick="resetTracker()">↺ Reset</button>
+    </div>
+
+    <div class="tracker-goal-banner" id="trackerBanner">
+      🎉 Ziel erreicht! Du hast alle <span id="bannerCount"></span> Quellen zusammen.
+    </div>
+
+    <div class="tracker-progress-row">
+      <div class="tracker-progress-bar">
+        <div class="tracker-progress-fill" id="trackerFill"></div>
+      </div>
+      <span class="tracker-progress-text" id="trackerText">0 / 10 Quellen</span>
+    </div>
+
+    <div class="tracker-types" id="trackerTypes"></div>
+    <div class="tracker-empty visible" id="trackerEmpty">Noch kein Zitat generiert — fange mit dem ersten an! 🚀</div>
+
+    <div class="founder-insights" id="founderInsights">
+      <button class="founder-insights-toggle" id="founderInsightsToggle" type="button" onclick="toggleFounderInsights()">
+        <span>Founder-Insights (intern)</span>
+        <span class="founder-insights-meta">Nur lokal · nicht für Testnutzer</span>
+        <span class="founder-insights-chevron" id="founderInsightsChevron">⌄</span>
+      </button>
+
+      <div class="founder-insights-panel" id="founderInsightsPanel">
+        <div class="founder-insights-grid">
+          <div class="founder-insight-card">
+            <div class="founder-insight-label">Meistgenutzte Seite</div>
+            <div class="founder-insight-value" id="insightTopPage">Noch keine Daten</div>
+          </div>
+          <div class="founder-insight-card">
+            <div class="founder-insight-label">Häufigster Quellentyp</div>
+            <div class="founder-insight-value" id="insightTopSourceType">Noch keine Daten</div>
+          </div>
+          <div class="founder-insight-card">
+            <div class="founder-insight-label">Gespeicherte Zitate</div>
+            <div class="founder-insight-value" id="insightCitationSaves">0</div>
+          </div>
+          <div class="founder-insight-card">
+            <div class="founder-insight-label">Preis-Antworten</div>
+            <div class="founder-insight-value" id="insightSurveyTop">Noch keine Antworten</div>
+          </div>
+          <div class="founder-insight-card">
+            <div class="founder-insight-label">Studiengang</div>
+            <div class="founder-insight-value" id="insightStudyProgramTop">Noch keine Angaben</div>
+          </div>
+          <div class="founder-insight-card">
+            <div class="founder-insight-label">Stärkster Use Case</div>
+            <div class="founder-insight-value" id="insightValueType">Noch keine Daten</div>
+          </div>
+          <div class="founder-insight-card">
+            <div class="founder-insight-label">PDF-Nutzung</div>
+            <div class="founder-insight-value" id="insightPdfUsage">Noch keine Daten</div>
+          </div>
+        </div>
+
+        <div class="founder-insights-detail-row">
+          <div class="founder-insights-list-card">
+            <div class="founder-insights-list-title">Beliebte Seiten</div>
+            <div class="founder-insights-list" id="insightPageList"></div>
+          </div>
+          <div class="founder-insights-list-card">
+            <div class="founder-insights-list-title">Wert nach Quellentyp</div>
+            <div class="founder-insights-list" id="insightSourceTypeList"></div>
+          </div>
+        </div>
+
+        <div class="founder-insights-detail-row founder-insights-detail-row-secondary">
+          <div class="founder-insights-list-card">
+            <div class="founder-insights-list-title">Letzte Signale</div>
+            <div class="founder-insights-list" id="insightRecentList"></div>
+          </div>
+          <div class="founder-insights-list-card founder-insights-note-card">
+            <div class="founder-insights-list-title">Interpretation</div>
+            <div class="founder-insights-note" id="insightInterpretation">
+              Sobald echte Nutzung zusammenkommt, siehst du hier, welche Fälle wirklich ziehen und was du als Nächstes priorisieren solltest.
+            </div>
+          </div>
+        </div>
+
+        <div class="founder-insights-actions">
+          <button class="tracker-reset founder-reset founder-test" type="button" onclick="LexCitePricingSurvey.openForTest()">Preisfrage testen</button>
+          <button class="tracker-reset founder-reset" type="button" onclick="resetFounderInsights()">Insights zurücksetzen</button>
+        </div>
+      </div>
+    </div>
+  </div><!-- /tracker-page-card -->
+</div><!-- /page-tracker -->
+
+</div><!-- /container -->
+
+<!-- ══════════════════════════════════════════════════════════════
+     EDIT MODAL
+════════════════════════════════════════════════════════════════ -->
+<div class="edit-modal-overlay" id="editModal" style="display:none" onclick="if(event.target===this)closeEditModal()">
+  <div class="edit-modal-box">
+    <h3>✏️ Zitat bearbeiten</h3>
+    <label style="font-size:0.8em;color:var(--muted);display:block;margin-bottom:6px">Vollzitat</label>
+    <textarea class="edit-modal-textarea" id="editFullText"></textarea>
+    <label style="font-size:0.8em;color:var(--muted);display:block;margin:10px 0 6px">Kurzzitat <span style="font-size:0.9em;opacity:.7">(optional)</span></label>
+    <textarea class="edit-modal-textarea" id="editKurzText" style="min-height:54px"></textarea>
+    <div class="edit-modal-actions">
+      <button class="btn-edit-cancel" onclick="closeEditModal()">Abbrechen</button>
+      <button class="btn-edit-save"   onclick="saveEditModal()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     ONBOARDING MODAL (first visit)
+════════════════════════════════════════════════════════════════ -->
+<div class="onboarding-overlay" id="onboardingModal" style="display:none">
+  <div class="onboarding-box">
+    <div class="onboarding-logo">⚖️ LexCite</div>
+    <div class="onboarding-tagline">Dein Schnellstart für juristische Arbeiten im Schweizer Studienalltag</div>
+
+    <div class="onboarding-intro">
+      Starte entweder mit einem PDF oder direkt mit dem Quellentyp. Ziel ist nicht nur ein korrektes Einzelzitat, sondern eine saubere und konsistente Arbeit.
+    </div>
+
+    <div class="onboarding-steps">
+      <div class="onboarding-step">
+        <div class="onboarding-step-icon">✍️</div>
+        <div class="onboarding-step-text">
+          <strong>1. Zitieren</strong>
+          <span>Quellentyp wählen oder PDF hochladen. LexCite baut daraus Vollzitat, Kurzangabe und Verzeichniseintrag.</span>
+        </div>
+      </div>
+      <div class="onboarding-step">
+        <div class="onboarding-step-icon">🔍</div>
+        <div class="onboarding-step-text">
+          <strong>2. Prüfen</strong>
+          <span>Bereits geschriebene Fussnoten einfügen und typische Guide-Fehler oder Inkonsistenzen erkennen.</span>
+        </div>
+      </div>
+      <div class="onboarding-step">
+        <div class="onboarding-step-icon">📚</div>
+        <div class="onboarding-step-text">
+          <strong>3. Quellen verwalten</strong>
+          <span>Literatur, Judikatur, Materialien und Abkürzungen an einem Ort sammeln und exportieren.</span>
+        </div>
+      </div>
+      <div class="onboarding-step">
+        <div class="onboarding-step-icon">📊</div>
+        <div class="onboarding-step-text">
+          <strong>4. Arbeit absichern</strong>
+          <span>Mit Projektmodus, Tracker und Konsistenz-Check siehst du schneller, was vor der Abgabe noch fehlt.</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="onboarding-start-btn" onclick="closeOnboarding(); switchPage('zitieren'); document.getElementById('pageNav').scrollIntoView({behavior:'smooth', block:'start'})">Mit Zitieren starten →</button>
+    <span class="onboarding-skip" onclick="closeOnboarding()">Nicht mehr anzeigen</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <span>© 2026 LexCite &nbsp;·&nbsp; Detjon Dreshaj</span>
+  <span class="footer-sep">|</span>
+  <div class="footer-links">
+    <a onclick="openModal('impressumModal')">Impressum</a>
+    <span class="footer-sep">·</span>
+    <a onclick="openModal('datenschutzModal')">Datenschutz</a>
+  </div>
+</footer>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL: IMPRESSUM
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="impressumModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('impressumModal')" title="Schliessen">×</button>
+    <h2>Impressum</h2>
+
+    <h3>Anbieter</h3>
+    <p>Detjon Dreshaj<br>
+    <span class="placeholder-hint">⚠️ Platzhalter: Bitte Strasse, Hausnummer, PLZ und Ort ergänzen — ohne Adresse ist das Impressum unvollständig (Art. 3 Abs. 1 UWG)<br>
+    [Strasse Nr.], [PLZ Ort], Schweiz</span>
+    E-Mail: <a href="mailto:detjon-dreshaj@hotmail.com">detjon-dreshaj@hotmail.com</a></p>
+
+    <h3>Hinweis zum Zitierformat</h3>
+    <p>Das Zitierformat orientiert sich an: Roger Müller, ZitierGuide – Leitfaden zur juristischen Zitierweise, 5. Aufl., Schulthess, Zürich 2022. Die Implementierung der Formatlogik erfolgt eigenständig; es werden keine Textpassagen aus dem Werk verwendet.</p>
+
+    <h3>Haftungsausschluss</h3>
+    <p>LexCite unterstützt bei der Erstellung von Zitaten nach schweizerischem juristischem Standard. Für die Richtigkeit und Vollständigkeit der vom Nutzer eingegebenen Angaben ist der Nutzer verantwortlich. Die Haftung für vorsätzlich oder grob fahrlässig verursachte Schäden bleibt unbeschränkt. Im Übrigen wird die Haftung für leicht fahrlässig verursachte indirekte Schäden (Folge- und mittelbare Schäden) ausgeschlossen, soweit gesetzlich zulässig.</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL: DATENSCHUTZ
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="datenschutzModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('datenschutzModal')" title="Schliessen">×</button>
+    <h2>Datenschutzhinweis</h2>
+
+    <h3>Verantwortlicher</h3>
+    <p>Detjon Dreshaj, <a href="mailto:detjon-dreshaj@hotmail.com">detjon-dreshaj@hotmail.com</a></p>
+
+    <h3>Lokale Verarbeitung – keine Datenübertragung</h3>
+    <p>Alle von Ihnen hochgeladenen PDF-Dateien werden <strong>ausschliesslich lokal in Ihrem Browser</strong> verarbeitet. Es findet keine Übertragung von Dateiinhalten an unsere oder fremde Server statt. Die Dateien verlassen Ihr Gerät zu keinem Zeitpunkt.</p>
+
+    <h3>Technische Zugriffsdaten</h3>
+    <p>Beim Aufruf der Webseite können durch den Hosting-Anbieter technische Protokolldaten (z. B. IP-Adresse, Datum und Uhrzeit, aufgerufene URL, User-Agent) in Server-Logfiles gespeichert werden. Diese Daten dienen der Sicherstellung des technischen Betriebs und der Sicherheit und werden nicht mit anderen Daten verknüpft. Die Speicherung erfolgt nur für die hierzu erforderliche Dauer; anschliessend werden die Daten gelöscht oder anonymisiert.</p>
+
+    <h3>Cookies und Tracking</h3>
+    <p>Diese Webseite verwendet <strong>keine Cookies</strong> und kein Tracking. Es werden keine Analyse- oder Werbe-Tools eingesetzt.</p>
+
+    <h3>Drittanbieter (CDN)</h3>
+    <p>Zum Laden der PDF-Verarbeitungsbibliothek (PDF.js) wird eine technisch notwendige Anfrage an <strong>cdnjs.cloudflare.com</strong> gestellt. Dabei kann Ihre IP-Adresse an Cloudflare Inc. (USA) übermittelt werden. Diese Übermittlung ist erforderlich, um die Bibliothek bereitzustellen. Weitere Informationen: <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Cloudflare Datenschutzrichtlinie</a>. Sofern möglich, wird die Bibliothek künftig lokal gehostet, um die Datenübermittlung zu minimieren.</p>
+
+    <h3>Rechte der Nutzer</h3>
+    <p>Da LexCite selbst keine personenbezogenen Daten erhebt oder speichert, bestehen insoweit keine weitergehenden Auskunfts- oder Löschpflichten unsererseits. Soweit der Hosting-Anbieter technische Protokolldaten verarbeitet, können Sie Ihre Rechte (Auskunft, Berichtigung, Löschung) uns gegenüber geltend machen; wir leiten diese Anfragen an den Anbieter weiter. Kontakt: <a href="mailto:detjon-dreshaj@hotmail.com">detjon-dreshaj@hotmail.com</a></p>
+
+    <h3>Anwendbares Recht</h3>
+    <p>Es gilt das Bundesgesetz über den Datenschutz der Schweizerischen Eidgenossenschaft (DSG).</p>
+  </div>
+</div>
+<script src="./session.js"></script>
+<script src="./storage.js"></script>
+<script src="./usage-analytics.js"></script>
+<script src="./account.js"></script>
+<script src="./backend-config.js"></script>
+<script src="./pricing-survey.js"></script>
+<script src="./sync-payload.js"></script>
+<script src="./sync-journal.js"></script>
+<script src="./remote-adapter.js"></script>
+<script src="./sync.js"></script>
+<script src="./pdf-detection.js"></script>
+<script src="./pdf-ui.js"></script>
+<script src="./workspace.js"></script>
+<script src="./citation-rules.js"></script>
+<script src="./citation-audit.js"></script>
+<script src="./checker-ui.js"></script>
+<script src="./tracker.js"></script>
+<script src="./hero-demo.js"></script>
+</body>
+</html>

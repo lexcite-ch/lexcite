@@ -3150,6 +3150,17 @@
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 10px;
     }
+    .checker-ref-subsection + .checker-ref-subsection {
+      margin-top: 14px;
+    }
+    .checker-ref-subsection-title {
+      font-size: 0.72em;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 0 0 8px;
+    }
     .checker-ref-chip {
       border: 1px solid var(--border);
       background: var(--surface);

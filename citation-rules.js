@@ -510,24 +510,108 @@ function renderReferenceCases() {
   GUIDE_REFERENCE_CASES.forEach(ref => {
     grouped[categoryFor(ref)].push(ref);
   });
+  const sectionOrder = {
+    entscheid: [
+      'bge',
+      'bger',
+      'bvge',
+      'bvger',
+      'kantonal',
+      'kantonal-zr',
+    ],
+    werke: [
+      'monographie',
+      'dissertation',
+      'habilitation',
+      'monographie-kurz',
+      'dissertation-kurz',
+    ],
+    literatur: [
+      'kommentar',
+      'kommentar-kurz',
+      'zeitschrift',
+      'zeitschrift-kurz',
+      'zeitschrift-jusletter',
+      'sammelband',
+      'sammelband-kurz',
+    ],
+    normen: [
+      'materialien',
+      'materialien-kurz',
+      'amtl-bull',
+      'gesetz',
+      'gesetz-sar',
+      'gesetz-kurz',
+    ],
+    online: [
+      'internet',
+      'internet-kurz-ziff',
+      'internet-kurz-kapitel',
+      'internet-kurz-abschnitt',
+    ],
+  };
+  const subsectionMeta = {
+    literatur: [
+      {
+        title: 'Kommentare',
+        ids: ['kommentar', 'kommentar-kurz'],
+      },
+      {
+        title: 'Zeitschriften',
+        ids: ['zeitschrift', 'zeitschrift-kurz', 'zeitschrift-jusletter'],
+      },
+      {
+        title: 'Sammelbände',
+        ids: ['sammelband', 'sammelband-kurz'],
+      },
+    ],
+  };
 
   el.innerHTML = Object.entries(categoryMeta).map(([key, meta]) => {
-    const refs = grouped[key] || [];
+    const refs = [...(grouped[key] || [])];
+    const desiredOrder = sectionOrder[key] || [];
+    refs.sort((a, b) => {
+      const ai = desiredOrder.indexOf(a.id);
+      const bi = desiredOrder.indexOf(b.id);
+      const av = ai === -1 ? Number.MAX_SAFE_INTEGER : ai;
+      const bv = bi === -1 ? Number.MAX_SAFE_INTEGER : bi;
+      return av - bv || a.label.localeCompare(b.label, 'de-CH');
+    });
     if (!refs.length) return '';
+    const defaultGrid = `
+      <div class="checker-ref-section-grid">
+        ${refs.map(ref => `
+          <button class="checker-ref-chip" onclick="loadReferenceCase('${ref.id}')" type="button">
+            <strong>${esc(ref.label)}</strong>
+            <span>${esc(ref.citation.slice(0, 80))}${ref.citation.length > 80 ? '…' : ''}</span>
+          </button>
+        `).join('')}
+      </div>
+    `;
+    const subsectionContent = (subsectionMeta[key] || []).map(group => {
+      const groupRefs = refs.filter(ref => group.ids.includes(ref.id));
+      if (!groupRefs.length) return '';
+      return `
+        <div class="checker-ref-subsection">
+          <div class="checker-ref-subsection-title">${esc(group.title)}</div>
+          <div class="checker-ref-section-grid">
+            ${groupRefs.map(ref => `
+              <button class="checker-ref-chip" onclick="loadReferenceCase('${ref.id}')" type="button">
+                <strong>${esc(ref.label)}</strong>
+                <span>${esc(ref.citation.slice(0, 80))}${ref.citation.length > 80 ? '…' : ''}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
     return `
       <section class="checker-ref-section">
         <div class="checker-ref-section-head">
           <div class="checker-ref-section-title">${esc(meta.title)}</div>
           <div class="checker-ref-section-intro">${esc(meta.intro)}</div>
         </div>
-        <div class="checker-ref-section-grid">
-          ${refs.map(ref => `
-            <button class="checker-ref-chip" onclick="loadReferenceCase('${ref.id}')" type="button">
-              <strong>${esc(ref.label)}</strong>
-              <span>${esc(ref.citation.slice(0, 80))}${ref.citation.length > 80 ? '…' : ''}</span>
-            </button>
-          `).join('')}
-        </div>
+        ${subsectionContent || defaultGrid}
       </section>
     `;
   }).join('');

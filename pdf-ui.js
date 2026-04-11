@@ -768,8 +768,17 @@ const FORMS = {
       const zitSufT = sw ? ` (zit. ${authorsShortText(a)}, ${sw}).` : '';
       const fH=`${authorsFullHtml(a)}, ${esc(t)}, ${esc(z)} ${esc(j)} S. ${esc(ss)} ff.${zitSufH}`;
       const fT=`${authorsFullText(a)}, ${t}, ${z} ${j} S. ${ss} ff.${zitSufT}`;
-      let kH=`${authorsShortHtml(a)}`; if(sw) kH+=`, ${esc(sw)}`; kH+=`, S. ${esc(sk||ss)}.`;
-      let kT=`${authorsShortText(a)}`; if(sw) kT+=`, ${sw}`; kT+=`, S. ${sk||ss}.`;
+      let kH=`${authorsShortHtml(a)}`;
+      let kT=`${authorsShortText(a)}`;
+      if (sw) {
+        kH += `, ${esc(sw)}`;
+        kT += `, ${sw}`;
+      } else {
+        kH += `, ${esc(t)}, ${esc(z)} ${esc(j)}`;
+        kT += `, ${t}, ${z} ${j}`;
+      }
+      kH += `, S. ${esc(sk||ss)}.`;
+      kT += `, S. ${sk||ss}.`;
       showOutput(fH,fT,kH,kT);
     }
   },
@@ -829,8 +838,17 @@ const FORMS = {
       if(showAufl) fH+=`, ${esc(aufl)}. Aufl.`; fH+=`, ${esc(orte)} ${esc(j)}, S. ${esc(ss)} ff.${zitSufH}`;
       let fT=`${authorsFullText(a)}, ${t}, in: ${hrsgT} (Hrsg.), ${sbt}`;
       if(showAufl) fT+=`, ${aufl}. Aufl.`; fT+=`, ${orte} ${j}, S. ${ss} ff.${zitSufT}`;
-      let kH=`${authorsShortHtml(a)}`; if(sw) kH+=`, ${esc(sw)}`; kH+=`, S. ${esc(sk||ss)}.`;
-      let kT=`${authorsShortText(a)}`; if(sw) kT+=`, ${sw}`; kT+=`, S. ${sk||ss}.`;
+      let kH=`${authorsShortHtml(a)}`;
+      let kT=`${authorsShortText(a)}`;
+      if (sw) {
+        kH += `, ${esc(sw)}`;
+        kT += `, ${sw}`;
+      } else {
+        kH += `, ${esc(t)}`;
+        kT += `, ${t}`;
+      }
+      kH += `, S. ${esc(sk||ss)}.`;
+      kT += `, S. ${sk||ss}.`;
       showOutput(fH,fT,kH,kT);
     }
   },

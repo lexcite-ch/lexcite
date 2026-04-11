@@ -154,18 +154,45 @@ function detectSource(text, filename) {
         }};
       }
 
-      // ── Zeitschriftenartikel: «AJP 2002 S. 669», «SJZ 1993 S. 93» ──
-      const zeitDocM = dok.match(/^([A-Za-z]+(?:\/[A-Za-z]+)?)\s+(\d{4})\s+S\.\s*(\d+)/);
+      // ── Zeitschriftenartikel: «AJP 2002 S. 669», «ZBJV 156/2020 S. 451» ──
+      // Band/Jahr-Format (z.B. «156/2020») ODER reines Jahr (z.B. «2020»)
+      const zeitDocM = dok.match(/^([A-Za-z]+(?:\/[A-Za-z]+)?)\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/);
       if (zeitDocM) {
         const abk = zeitDocM[1], jahr = zeitDocM[2], seite = zeitDocM[3];
         return { type:'zeitschrift', fields:{
           zeitschrift:  abk,
-          jahr,
+          jahr,           // z.B. «156/2020» oder «2020»
           seite_start:  seite,
           titel:        swTitelRaw,
           nachnamen_raw,
           vornamen_raw,
         }};
+      }
+
+      // ── Fallback: Swisslex kantonaler Entscheid (z.B. STBER.2023.83, ZR, etc.) ──
+      // Tritt ein wenn «Dokument»-Feld keinem bekannten Muster entspricht,
+      // aber Gericht + Urteilsdatum vorhanden sind.
+      {
+        const swissGericht = swMeta('Gericht', 'Rechtsgebiete|Publikation|Betreff|Seite');
+        const swissDatum   = (swissHead.match(/\bUrteilsdatum\s+(\d{1,2}\.\d{1,2}\.\d{4})/i) || [])[1] || '';
+        if (swissGericht || swissDatum) {
+          let gericht = '';
+          const kgM = swissGericht.match(/^([A-Za-zÄÖÜäöü\s.\-]+?),\s*(.+)$/);
+          if (kgM) {
+            const kantonMap = {'Zürich':'ZH','Bern':'BE','Luzern':'LU','Basel-Stadt':'BS',
+              'Basel-Landschaft':'BL','St. Gallen':'SG','Aargau':'AG','Thurgau':'TG',
+              'Graubünden':'GR','Tessin':'TI','Waadt':'VD','Genf':'GE','Zug':'ZG',
+              'Solothurn':'SO','Freiburg':'FR'};
+            gericht = kgM[2].trim() + ' ' + (kantonMap[kgM[1].trim()] || kgM[1].trim());
+          } else gericht = swissGericht;
+          return { type: 'kantonal', fields: {
+            gericht,
+            datum:   swissDatum,
+            jahr:    swissDatum ? (swissDatum.match(/\d{4}$/) || [])[0] || '' : '',
+            zeitschrift: '',
+            seite: '',
+          }};
+        }
       }
     }
   }
@@ -189,20 +216,20 @@ function detectSource(text, filename) {
     const textAuthors = extractAuthorsFromHead(head) ||
                         extractAuthorsFromHead(t.substring(0, 800));
     let nachnamen_raw, vornamen_raw;
-    if (textAuthors.length >= nachnamen.length && textAuthors.length > 0) {
-      // Vollständige Namensinfo aus Text
-      nachnamen_raw = textAuthors.map(a => a.nachname);
-      vornamen_raw  = textAuthors.map(a => a.vorname);
-    } else {
-      // Fallback: Nachnamen aus Dateiname, Vornamen durch Volltext-Suche «Vorname Nachname»
-      nachnamen_raw = nachnamen;
-      vornamen_raw  = nachnamen.map(nn => {
-        // Suche im Volltext nach «Vorname Nachname» — überspringt BSK-Header-Kürzel (I-Portmann)
-        const rx = new RegExp('([A-ZÄÖÜ][a-zäöü]{1,15})\\s+' + nn + '(?:\\b|/)');
-        const m = t.match(rx);
-        return m ? m[1] : '';
-      });
-    }
+    // BSK: Nachnamen IMMER aus Dateiname (z.B. Infanger, nicht Spühler als Hrsg.)
+    // Vornamen: aus Text, sofern der Dateiname-Nachname dort vorkommt
+    nachnamen_raw = nachnamen;
+    vornamen_raw  = nachnamen.map(nn => {
+      // Bevorzuge textAuthors-Eintrag der exakt dem Dateinamen-Nachnamen entspricht
+      if (textAuthors.length > 0) {
+        const match = textAuthors.find(a => a.nachname.toLowerCase() === nn.toLowerCase());
+        if (match) return match.vorname;
+      }
+      // Fallback: Suche «Vorname Nachname» im Volltext
+      const rx = new RegExp('([A-ZÄÖÜ][a-zäöü]{1,15})\\s+' + nn + '(?:\\b|/)');
+      const m = t.match(rx);
+      return m ? m[1] : '';
+    });
     // Herausgeber: erst Head, dann erste 800 Zeichen
     let hrsg_raw = extractHrsgFromHead(head);
     if (!hrsg_raw.length) hrsg_raw = extractHrsgFromHead(t.substring(0, 800));
@@ -223,6 +250,100 @@ function detectSource(text, filename) {
     };
   }
 
+  // ──────────────────────────────────────────────────────────────
+  //  STUFE 1b: Legaltip / Legalis Zeitschrift-Export im Dateinamen
+  //  z.B. «Martin-Schubarth-...-AJP-PJA-5-2008-S-519-ff.pdf»
+  //       «Patrick-Vogler-...-AJP-PJA-6-2020-S-739-ff.pdf»
+  // ──────────────────────────────────────────────────────────────
+  {
+    const legaltipM = filename.match(
+      /[-_](AJP|ZBJV|SJZ|ZBl|BJM|SZW|ZSR|sic|HAVE|REPRAX|GesKR|Medialex|recht)[-_](?:PJA[-_])?(\d+)[-_](\d{4})[-_]S[-_](\d+)/i
+    );
+    if (legaltipM) {
+      const abk  = legaltipM[1].toUpperCase();
+      const heft = legaltipM[2];   // Heft-/Band-Nummer
+      const yr   = legaltipM[3];
+      const pg   = legaltipM[4];
+      // ZBJV und ZBl verwenden Band/Jahr-Format (z.B. 152/2016), AJP nur Jahr
+      const jahr = (abk === 'ZBJV' || abk === 'ZBl') ? `${heft}/${yr}` : yr;
+      // Autor aus Dateiname-Anfang (Vorname-Nachname vor dem Schlagwort-Teil)
+      // Format: «Vorname-Nachname-Schlagwörter-...-AJP-PJA-N-YYYY-S-NNN-ff.pdf»
+      const beforeJournal = filename.substring(0, legaltipM.index).replace(/[-_]$/, '');
+      const autorSegs = beforeJournal.split(/[-_]/).filter(Boolean);
+      const nachnamen_raw = autorSegs.length >= 2 ? [capitalize(autorSegs[1])] : undefined;
+      const vornamen_raw  = autorSegs.length >= 1 ? [capitalize(autorSegs[0])] : undefined;
+      // Titel: nach «[Seite NN]» Marker suchen (Legaltip-Format)
+      const titelM = t.match(/\[Seite\s+\d+\]\s*(.+?)(?:\n|$)/i);
+      return { type: 'zeitschrift', fields: {
+        zeitschrift:   abk,
+        jahr,
+        seite_start:   pg,
+        titel:         titelM ? titelM[1].trim().replace(/[–;-]\s*$/, '').trim() : '',
+        nachnamen_raw,
+        vornamen_raw,
+      }};
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  //  STUFE 1c: Kommentar-Beitrag «Autor-in-Hrsg-Hrsg-Art-NN-LAW.pdf»
+  //  z.B. «Fabian-Duss-Marco-Buchmann-in-Zweifel-Beusch-Hrsg-Art-69-DBG.pdf»
+  //       «Markus-Reich-Julia-von-Ah-in-Zweifel-Beusch-Hrsg-Art-18-DBG.pdf»
+  // ──────────────────────────────────────────────────────────────
+  {
+    const inHrsgM = filename.match(
+      /^([A-Za-zÄÖÜäöü]+-[A-Za-zÄÖÜäöü]+.+?)-in-([A-Za-zÄÖÜäöü]+-[A-Za-zÄÖÜäöü]+.*?)-(?:Hrsg|Hg|hrsg)(?:[-_]Art-(\d+[a-z]?)(?:[-_]([A-Za-z]+))?)?/i
+    );
+    if (inHrsgM) {
+      const PARTICLES = new Set(['von','van','de','du','der','den','zum','zur','am','auf']);
+      const parseNames = str => {
+        const segs = str.split('-');
+        const nns = [], vns = [];
+        let i = 0;
+        while (i + 1 < segs.length) {
+          const vn = capitalize(segs[i]); i++;
+          let nn = segs[i]; i++;
+          if (PARTICLES.has(nn.toLowerCase()) && i < segs.length) {
+            nn = nn.toLowerCase() + ' ' + capitalize(segs[i]);
+            i++;
+          } else {
+            nn = capitalize(nn);
+          }
+          vns.push(vn);
+          nns.push(nn);
+        }
+        return { nachnamen: nns, vornamen: vns };
+      };
+      const { nachnamen: nna, vornamen: vna } = parseNames(inHrsgM[1]);
+      const { nachnamen: hrsgNa, vornamen: hrsgVna } = parseNames(inHrsgM[2]);
+      const artNr  = inHrsgM[3] || '';
+      const gesetz = inHrsgM[4] ? inHrsgM[4].toUpperCase() : '';
+      // Auflage — Legalis nutzt «Au ﬂage» oder «Au f l» mit Ligatur/Leerzeichen
+      const aufM  = t.match(/(\d+)\.\s*Au\s*(?:f\s*l|ﬂ)/i);
+      // Jahr — «, 2022» oder «Auflage 2022»
+      const jahrM = t.match(/(?:Auflage\s*,?\s*|,\s*)(20\d{2}|19\d{2})/i);
+      // Ort aus bekannten Verlagen
+      const ortM  = t.match(/\b(Helbing\s+Licht|Stämpfli|Schulthess)\b/i);
+      const ort   = ortM ? (/Helbing/i.test(ortM[1]) ? 'Basel' :
+                           /Stämpfli/i.test(ortM[1]) ? 'Bern' : 'Zürich') : '';
+      // hrsg_raw: Nachnamen der Herausgeber (für Quellentype Kommentar)
+      const hrsg_raw = hrsgNa.length
+        ? hrsgNa.map((nn, i) => ({ nachname: nn, vorname: hrsgVna[i] || '' }))
+        : [];
+      return { type: 'kommentar', fields: {
+        art_von:       artNr,
+        gesetz,
+        komm_name:     '',   // Nutzer füllt Titel manuell aus
+        nachnamen_raw: nna,
+        vornamen_raw:  vna,
+        hrsg_raw:      hrsg_raw.map(h => h.vorname ? `${h.vorname} ${h.nachname}` : h.nachname),
+        auflage:       aufM  ? aufM[1]  : '',
+        jahr:          jahrM ? jahrM[1] : '',
+        orte:          ort,
+      }};
+    }
+  }
+
   // BGE im Dateinamen: BGE-129-III-276.pdf oder BGE_140_I_305.pdf
   const bgeFnM = filename.match(/BGE[-_\s]+(\d{2,3})[-_\s]+([IVX]+)[-_\s]+(\d+)/i);
   if (bgeFnM) {
@@ -241,12 +362,30 @@ function detectSource(text, filename) {
 
   // LA / Arbeitsgericht im Dateinamen (z.B. LA220010-O9.pdf)
   if (/^LA\d+/i.test(filename)) {
-    const yearM = filename.match(/\d{4}/) || t.match(/\b(20\d{2}|19\d{2})\b/);
+    const datum = extractDecisionDate(t);
+    // Jahr aus Datum (zuverlässig), NICHT aus Dateiname (LA220010 → falsche «2200»)
+    const yearM = datum ? datum.match(/\d{4}/) : t.match(/\b(20\d{2}|19\d{2})\b/);
     return { type: 'kantonal', fields: {
       gericht: 'Arbeitsgericht',
-      datum:   extractDecisionDate(t),
-      jahr:    yearM  ? yearM[0]  : ''
+      datum,
+      jahr:    yearM ? yearM[0] : ''
     }};
+  }
+
+  // Kantonale Gerichtsakten im Dateinamen (z.B. HG120134-O24.pdf)
+  const kantonalCourtFile = extractCantonalCourtFromFilename(filename, t);
+  if (kantonalCourtFile) {
+    const datum = extractDecisionDate(head) || extractDecisionDate(t);
+    const yearM = datum ? datum.match(/\d{4}$/) : null;
+    return {
+      type: 'kantonal',
+      fields: {
+        gericht: kantonalCourtFile,
+        datum: datum || '',
+        jahr: yearM ? yearM[0] : '',
+        erwaegung: extractDecisionConsideration(head) || extractDecisionConsideration(t),
+      }
+    };
   }
 
   // AGer-Z / kantonaler Entscheid im Dateinamen
@@ -290,6 +429,56 @@ function detectSource(text, filename) {
       jahr:        aGerFnM[2],
       seite:       seiteHdrM ? seiteHdrM[1] : (seiteFbM ? seiteFbM[1] : '')
     }};
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  //  STUFE 2a: Navigator.ch / OFK (Orell Füssli Kommentar)
+  //  Erkennungsmerkmal: «Artikelkommentar [LAW] [ARTNR]» in Kopf
+  //  oder «Reihe OFK – Orell Füssli Kommentar»
+  //  Format: Navigator.ch PDF-Export (ähnlich Legalis)
+  // ──────────────────────────────────────────────────────────────
+  {
+    const navHead = t.substring(0, 700);
+    if (/\bArtikelkommentar\b/i.test(navHead) || /\bReihe\s+OFK\b/i.test(navHead)) {
+      // Art.-Nr. + Gesetz aus erster Zeile: «Artikelkommentar StGB 122»
+      const artLineM   = navHead.match(/Artikelkommentar\s+([A-Za-z]+)\s+(\d+[a-z]?)/i);
+      const art_von    = artLineM ? artLineM[2] : '';
+      // Gesetz NICHT uppercase() — StGB würde sonst zu STGB
+      const gesetz     = artLineM ? artLineM[1] : '';
+      // Kommentator: «Autoren Andreas Donatsch»
+      const autorM     = navHead.match(/\bAutoren?\s+([^\n]+)/i);
+      const autorRaw   = autorM ? autorM[1].trim() : '';
+      const autorParts = autorRaw.split(/\s+/).filter(Boolean);
+      const nachnamen_raw = autorParts.length >= 2
+        ? [autorParts[autorParts.length - 1]]
+        : (autorRaw ? [autorRaw] : []);
+      const vornamen_raw  = autorParts.length >= 2
+        ? [autorParts.slice(0, -1).join(' ')]
+        : [''];
+      // Kommentar-Titel: «Titel StGB/JStG Kommentar»
+      const kommTitelM = navHead.match(/\bTitel\s+([^\n]+)/i);
+      const komm_name  = kommTitelM ? kommTitelM[1].trim() : 'OFK';
+      // Auflage: «Auflage 21., überarbeitete Auflage 2022»
+      const aufM  = navHead.match(/Auflage\s+(\d+)/i);
+      const jahrM = navHead.match(/\bJahr\s+(\d{4})/i);
+      const seitenM = navHead.match(/\bSeiten\s+(\d+)/i);
+      // Herausgeber: «Herausgeber Andreas Donatsch»
+      const hrsgM    = navHead.match(/\bHerausgeber\s+([^\n]+)/i);
+      const hrsgRaw  = hrsgM ? hrsgM[1].trim() : '';
+      const hrsg_raw = hrsgRaw ? [hrsgRaw] : [];
+      return { type: 'kommentar', fields: {
+        art_von,
+        gesetz,
+        komm_name,
+        nachnamen_raw,
+        vornamen_raw,
+        hrsg_raw,
+        auflage:     aufM    ? aufM[1]    : '',
+        jahr:        jahrM   ? jahrM[1]   : '',
+        orte:        'Zürich',   // Orell Füssli = Zürich
+        seite_start: seitenM ? seitenM[1] : '',
+      }};
+    }
   }
 
   // ──────────────────────────────────────────────────────────────
@@ -406,6 +595,44 @@ function detectSource(text, filename) {
   }
 
   // ──────────────────────────────────────────────────────────────
+  //  STUFE 3c: JUSLETTER
+  //  Erkennungsmerkmal: ISSN 1424-7410 oder jusletter.weblaw.ch
+  //  Goldgrube: «Zitiervorschlag: Vorname Nachname, Titel, in: Jusletter DD. Mon. YYYY»
+  // ──────────────────────────────────────────────────────────────
+  if (/1424-7410|jusletter\.weblaw\.ch/i.test(t)) {
+    // Zitiervorschlag parsen — enthält Autor, Titel und Datum fertig aufbereitet
+    const zitM = t.match(/Zitiervorschlag\s*:\s*(.+?),\s*(.+?),\s*in:\s*Jusletter\s+(\d{1,2}\.\s*\w+\.?\s*\d{4})/i);
+    let nachnamen_raw, vornamen_raw, titel = '', datum = '';
+    if (zitM) {
+      const autorRaw = zitM[1].trim();
+      const parts = autorRaw.split(/\s+/).filter(Boolean);
+      // Jusletter schreibt «Vorname Nachname»
+      nachnamen_raw = [parts.length >= 2 ? parts[parts.length - 1] : autorRaw];
+      vornamen_raw  = [parts.length >= 2 ? parts.slice(0, -1).join(' ') : ''];
+      titel = zitM[2].trim();
+      datum = zitM[3].trim();
+    } else {
+      // Fallback: erste Zeile = Autorname, zweite = Titel
+      const lines = t.split('\n').map(l => l.trim()).filter(Boolean);
+      const autorLine = lines[0] || '';
+      const parts = autorLine.split(/\s+/).filter(Boolean);
+      nachnamen_raw = [parts.length >= 2 ? parts[parts.length - 1] : autorLine];
+      vornamen_raw  = [parts.length >= 2 ? parts.slice(0, -1).join(' ') : ''];
+      titel = lines[1] || '';
+      const jahrM2 = t.match(/Jusletter\s+(?:\d{1,2}\.\s*\w+\.?\s*)?(\d{4})/i);
+      datum = jahrM2 ? jahrM2[0].replace(/^Jusletter\s+/i,'').trim() : '';
+    }
+    return { type: 'zeitschrift', fields: {
+      zeitschrift:  'Jusletter',
+      jahr:         datum,   // Jusletter hat Datum statt Jahrgang
+      seite_start:  '',
+      titel,
+      nachnamen_raw,
+      vornamen_raw,
+    }};
+  }
+
+  // ──────────────────────────────────────────────────────────────
   //  STUFE 4: ZEITSCHRIFTENARTIKEL
   // ──────────────────────────────────────────────────────────────
   // Bekannte Zeitschriften-Abkürzungen: Muster «AJP 2015 S. 123» im Volltext
@@ -413,27 +640,32 @@ function detectSource(text, filename) {
   const journals = [
     { abk: 'AJP',   rx: /AJP[\s/]*(PJA)?[\s\/]*(20\d{2}|19\d{2})\s+S\.\s*(\d+)/i },
     { abk: 'SJZ',   rx: /SJZ\s+(20\d{2}|19\d{2})\s+S\.\s*(\d+)/i },
-    { abk: 'ZBJV',  rx: /ZBJV\s+(20\d{2}|19\d{2})\s+S\.\s*(\d+)/i },
-    { abk: 'ZBl',   rx: /ZBl\s+(20\d{2}|19\d{2})\s+S\.\s*(\d+)/i },
-    { abk: 'BJM',   rx: /BJM\s+(20\d{2}|19\d{2})\s+S\.\s*(\d+)/i },
-    { abk: 'ARV',   rx: /ARV\s+(20\d{2}|19\d{2})\s+S\.\s*(\d+)/i },
-    { abk: 'ZSR',   rx: /ZSR\s+(20\d{2}|19\d{2})\s+S\.\s*(\d+)/i },
+    // Band/Jahr-Format (z.B. «156/2020») wird durch (?:\d+\/)? unterstützt
+    { abk: 'ZBJV',  rx: /ZBJV\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
+    { abk: 'ZBl',   rx: /ZBl\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
+    { abk: 'BJM',   rx: /BJM\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
+    { abk: 'ARV',   rx: /ARV\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
+    { abk: 'ZSR',   rx: /ZSR\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
     // Arbeitsrecht-spezifische Zeitschriften
-    { abk: 'JAR',   rx: /JAR\s+(20\d{2}|19\d{2})(?:\s+S\.\s*(\d+))?/i },  // Jahrbuch des Arbeitsrechts
-    { abk: 'ArbR',  rx: /ArbR\s+(20\d{2}|19\d{2})\s+S\.\s*(\d+)/i },      // Jahrbuch Arbeitsrecht
-    { abk: 'recht', rx: /\brecht\s+(20\d{2}|19\d{2})\s+S\.\s*(\d+)/i },   // recht – Zeitschrift für juristische Ausbildung
-    { abk: 'HAVE',  rx: /HAVE\s+(20\d{2}|19\d{2})\s+S\.\s*(\d+)/i },      // Haftung und Versicherung
-    { abk: 'REPRAX',rx: /REPRAX\s+(20\d{2}|19\d{2})\s+S\.\s*(\d+)/i },    // Zeitschrift für Handelsregister
-    { abk: 'GesKR', rx: /GesKR\s+(20\d{2}|19\d{2})\s+S\.\s*(\d+)/i },    // Gesellschafts- und Kapitalmarktrecht
+    { abk: 'JAR',   rx: /JAR\s+((?:\d+\/)?\d{4})(?:\s+S\.\s*(\d+))?/i },  // Jahrbuch des Arbeitsrechts
+    { abk: 'ArbR',  rx: /ArbR\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
+    { abk: 'recht', rx: /\brecht\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
+    { abk: 'HAVE',  rx: /HAVE\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
+    { abk: 'REPRAX',rx: /REPRAX\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
+    { abk: 'GesKR', rx: /GesKR\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
+    // Zusätzliche Zeitschriften
+    { abk: 'sic!',  rx: /sic!\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
+    { abk: 'ZESAR', rx: /ZESAR\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
+    { abk: 'SZW',   rx: /SZW\s+((?:\d+\/)?\d{4})\s+S\.\s*(\d+)/i },
     { abk: 'AGer-Z',rx: /AGer-Z\s*(20\d{2}|19\d{2})/i },
   ];
   for (const { abk, rx } of journals) {
     const jM = t.match(rx);
     if (jM) {
-      // Jahr ist jM[1] oder jM[2] je nach Gruppe
-      const jahr  = (jM[1] && /^\d{4}$/.test(jM[1])) ? jM[1] :
-                    (jM[2] && /^\d{4}$/.test(jM[2])) ? jM[2] : '';
-      const seite = jM[3] || jM[2] || '';
+      // Jahr: entweder «2020» oder «156/2020» (Band/Jahr-Format)
+      const isJahr = v => v && /^(?:\d+\/)?\d{4}$/.test(v);
+      const jahr  = isJahr(jM[1]) ? jM[1] : isJahr(jM[2]) ? jM[2] : '';
+      const seite = jM[3] || (!isJahr(jM[2]) ? jM[2] : '') || '';
       const authHead = extractAuthorsFromHead(head);
       // Kantonaler Entscheid: Swisslex-Metadaten parsen
       if (abk === 'AGer-Z') {
@@ -482,6 +714,77 @@ function detectSource(text, filename) {
   }
 
   // ──────────────────────────────────────────────────────────────
+  //  STUFE 4a: DIKE / LEGALIS Metadaten-Block
+  //  Erkennungsmerkmal: «Buchautoren» Feld (Dike-spezifisch)
+  //  Format: Titel … Serie/Reihe … Buchautoren … Jahr … Seiten … Herausgeber … Verlag
+  // ──────────────────────────────────────────────────────────────
+  {
+    const dikeHead = t.substring(0, 900);
+    const dikeBuchAutM = dikeHead.match(/\bBuchautoren?\s+(.+?)(?=\s*(?:Jahr|Seiten|Herausgeber|ISBN|Verlag|$))/i);
+    if (dikeBuchAutM) {
+      const dikeTitelM2  = dikeHead.match(/\bTitel\s+(.+?)(?=\s*(?:Serie\/Reihe|Buchautoren|Jahr|Herausgeber|ISBN))/i);
+      const dikeSerieM2  = dikeHead.match(/\bSerie\/Reihe\s+(.+?)(?=\s*(?:Band\/Nr\.|Buchautoren|Jahr|Seiten|Herausgeber|ISBN|Verlag|$))/i);
+      const dikeHrsgM2   = dikeHead.match(/\bHerausgeber\s+(.+?)(?=\s*(?:ISBN|Verlag|Seiten|\d{3,}-|$))/i);
+      const dikeJahrM2   = dikeHead.match(/\bJahr\s+(\d{4})/i);
+      const dikeSeitenM2 = dikeHead.match(/\bSeiten\s+(\d+)/i);
+      const dikeVerlagM2 = dikeHead.match(/\bVerlag\s+(.+?)(?=\s*(?:ISBN|$))/i);
+
+      // Autor: letztes Wort = Nachname, Rest = Vorname(n)
+      const autorRaw   = dikeBuchAutM[1].trim();
+      const autorParts = autorRaw.split(/\s+/).filter(Boolean);
+      const nachnamen_raw = [autorParts.length >= 2 ? autorParts[autorParts.length - 1] : autorRaw];
+      const vornamen_raw  = [autorParts.length >= 2 ? autorParts.slice(0, -1).join(' ') : ''];
+
+      // Herausgeber parsen: «Roland Müller, Thomas Geiser» → [{vorname,nachname}]
+      const hrsg_raw = [];
+      if (dikeHrsgM2) {
+        dikeHrsgM2[1].trim().split(/,\s*/).forEach(p => {
+          const w = p.trim().split(/\s+/);
+          if (w.length >= 2) hrsg_raw.push({ vorname: w[0], nachname: w.slice(1).join(' ') });
+          else if (w.length === 1 && w[0]) hrsg_raw.push({ vorname: '', nachname: w[0] });
+        });
+      }
+
+      // sb_titel: aus Serie/Reihe (Band/Nr.-Anhang entfernen)
+      let sbTitel = '';
+      if (dikeSerieM2) sbTitel = dikeSerieM2[1].trim().replace(/\s+Band\/Nr\..*$/i, '').trim();
+
+      // Erscheinungsort: Verlag → bekannte Standorte
+      const verlagCityMap = {
+        'Dike': 'Zürich', 'Schulthess': 'Zürich', 'Stämpfli': 'Bern',
+        'Helbing': 'Basel', 'Orell': 'Zürich', 'Rüegger': 'Zürich',
+        'Nomos': 'Baden-Baden', 'DIKE': 'Zürich',
+      };
+      let orte = '';
+      if (dikeVerlagM2) {
+        for (const [v, city] of Object.entries(verlagCityMap)) {
+          if (dikeVerlagM2[1].includes(v)) { orte = city; break; }
+        }
+      }
+      if (!orte) {
+        const ortM2 = t.match(/\b(Bern|Basel|Zürich|Genf|Lausanne|St\. Gallen)\b/);
+        orte = ortM2 ? ortM2[1] : '';
+      }
+
+      const beitragTitel = dikeTitelM2 ? dikeTitelM2[1].replace(/\s+/g, ' ').trim() : '';
+
+      if (dikeHrsgM2) {
+        return { type: 'sammelband', fields: {
+          titel:       beitragTitel,
+          sb_titel:    sbTitel,
+          auflage:     '',
+          orte,
+          jahr:        dikeJahrM2   ? dikeJahrM2[1]   : '',
+          seite_start: dikeSeitenM2 ? dikeSeitenM2[1]  : '',
+          nachnamen_raw,
+          vornamen_raw,
+          hrsg_raw,
+        }};
+      }
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
   //  STUFE 4b: SWISSLEX-METADATEN-BLOCK (Sammelband / Monographie)
   //  Format: «Titel … Autor … Auflage … Jahr … Herausgeber … Verlag …»
   //  Wenn «Herausgeber» vorhanden → Sammelband-Beitrag
@@ -494,15 +797,18 @@ function detectSource(text, filename) {
                    || t.match(/\bHerausgeber\s+(.+?)(?=\s*(?:ISBN|Verlag|Seiten|\d{3}-|\u00a9|$))/i);
   const swissTitelM = swissHead.match(/\bTitel\s+(.+?)(?=\s*(?:Serie\/Reihe|Autor|Auflage|Jahr|Herausgeber|ISBN))/i)
                    || t.match(/\bTitel\s+(.+?)(?=\s*(?:Serie\/Reihe|Autor|Auflage|Jahr|Herausgeber|ISBN))/i);
+  const swissBuchTitelM = swissHead.match(/\bBuchtitel\s+(.+?)(?=\s*(?:Jahr|Seiten|Herausgeber|ISBN|Verlag))/i)
+                      || t.match(/\bBuchtitel\s+(.+?)(?=\s*(?:Jahr|Seiten|Herausgeber|ISBN|Verlag))/i);
   // Autor: erst im Head, dann im erweiterten Kopf bis 900 Zeichen
-  const swissAutorM = swissHead.match(/\bAutor\s+([A-Za-zÄÖÜäöü](?:[A-Za-zÄÖÜäöü\s.\-]+?)?)(?=\s*(?:Auflage|Jahr|Seiten|Herausgeber|ISBN|Verlag))/i)
-                   || t.substring(0, 900).match(/\bAutor\s+([A-Za-zÄÖÜäöü](?:[A-Za-zÄÖÜäöü\s.\-]+?)?)(?=\s*(?:Auflage|Jahr|Seiten|Herausgeber|ISBN|Verlag))/i);
+  const swissAutorM = swissHead.match(/\bAutor\s+([A-Za-zÄÖÜäöü](?:[A-Za-zÄÖÜäöü\s.\-]+?)?)(?=\s*(?:Titel|Serie\/Reihe|Buchtitel|Auflage|Jahr|Seiten|Herausgeber|ISBN|Verlag))/i)
+                   || t.substring(0, 900).match(/\bAutor\s+([A-Za-zÄÖÜäöü](?:[A-Za-zÄÖÜäöü\s.\-]+?)?)(?=\s*(?:Titel|Serie\/Reihe|Buchtitel|Auflage|Jahr|Seiten|Herausgeber|ISBN|Verlag))/i);
   const swissAuflM  = swissHead.match(/\bAuflage\s+(\d+)/i) || t.match(/\bAuflage\s+(\d+)/i);
   const swissJahrM  = swissHead.match(/\bJahr\s+(\d{4})/i)  || t.match(/\bJahr\s+(\d{4})/i);
   const swissSeitenM= swissHead.match(/\bSeiten\s+(\d+)/i)  || t.match(/\bSeiten\s+(\d+)/i);
 
   if (swissTitelM || swissAutorM) {
-    const sbTitel  = swissTitelM ? swissTitelM[1].trim() : '';
+    const beitragTitelMeta = swissTitelM ? swissTitelM[1].trim() : '';
+    const sbTitel  = swissBuchTitelM ? swissBuchTitelM[1].trim() : '';
     const autorRaw = swissAutorM ? swissAutorM[1].trim() : '';
     const auflage  = swissAuflM  ? swissAuflM[1]  : '';
     const jahr     = swissJahrM  ? swissJahrM[1]  : '';
@@ -510,18 +816,18 @@ function detectSource(text, filename) {
     // Verlag → Ort extrahieren (z.B. «Schulthess Juristische Medien AG» → Zürich/Basel/Genf aus Text)
     const ortM2  = t.match(/\b(Bern|Basel|Zürich|Genf|Lausanne|St\. Gallen)\b/);
     const orte   = ortM2 ? ortM2[1] : '';
-    // Autorname aufteilen: «Vorname Nachname» oder «Nachname Vorname»
-    const autorParts = autorRaw.split(/\s+/);
+    // Autorname aufteilen: Swisslex schreibt «Vorname [Zweiter Vorname] Nachname»
+    // Regel: letztes Wort = Nachname, Rest = Vorname(n)
+    const autorParts = autorRaw.split(/\s+/).filter(Boolean);
     let nachnamen_raw, vornamen_raw;
     if (autorParts.length >= 2) {
-      // Swisslex schreibt: «Angela Hensch» → Vorname zuerst
-      vornamen_raw  = [autorParts[0]];
-      nachnamen_raw = [autorParts.slice(1).join(' ')];
+      nachnamen_raw = [autorParts[autorParts.length - 1]];
+      vornamen_raw  = [autorParts.slice(0, -1).join(' ')];
     }
     if (swissHrsgM) {
       // ── Sammelband-Beitrag ──
-      // Beitragstitel aus Dateiname herleiten (ohne Dateiendung)
-      const beitragTitel = filename
+      // Beitragstitel bevorzugt aus Swisslex-Titel, sonst aus Dateiname herleiten
+      const beitragTitel = beitragTitelMeta || filename
         .replace(/\.pdf$/i,'')
         .replace(/_/g,' ')
         .replace(/\s*\|.*$/,'')  // alles nach Pipe entfernen
@@ -803,6 +1109,43 @@ function normalizeBGerCaseNumber(raw) {
   const m = s.match(/^(\d+[A-Za-z])[._](\d{1,6})[\/._](\d{4})$/);
   if (m) return `${m[1]}_${m[2]}/${m[3]}`;
   return s.replace(/^(\d+[A-Za-z])\.(\d{1,6}\/\d{4})$/, '$1_$2');
+}
+
+function extractCantonalCourtFromFilename(filename, text) {
+  const name = String(filename || '');
+  const patterns = [
+    { rx: /^HG\d/i, label: 'Handelsgericht' },
+    { rx: /^OG\d/i, label: 'Obergericht' },
+    { rx: /^KG\d/i, label: 'Kantonsgericht' },
+    { rx: /^VG\d/i, label: 'Verwaltungsgericht' },
+    { rx: /^SG\d/i, label: 'Sozialversicherungsgericht' },
+  ];
+  const match = patterns.find(entry => entry.rx.test(name));
+  if (!match) return '';
+
+  const t = String(text || '');
+  const cantonMap = {
+    'Zürich': 'ZH', 'Bern': 'BE', 'Luzern': 'LU', 'Basel-Stadt': 'BS',
+    'Basel-Landschaft': 'BL', 'St. Gallen': 'SG', 'Aargau': 'AG',
+    'Thurgau': 'TG', 'Graubünden': 'GR', 'Tessin': 'TI', 'Waadt': 'VD',
+    'Genf': 'GE', 'Zug': 'ZG', 'Solothurn': 'SO', 'Freiburg': 'FR',
+    'Wallis': 'VS', 'Neuenburg': 'NE', 'Jura': 'JU',
+  };
+
+  const courtTextPatterns = [
+    new RegExp(`${match.label}\\s+des\\s+Kantons\\s+([A-Za-zÄÖÜäöü.\\- ]+?)(?=\\s+(?:Urteil|Entscheid|Beschluss|vom)\\b|[.,;]|$)`, 'i'),
+    new RegExp(`${match.label}\\s+([A-Za-zÄÖÜäöü.\\- ]+?)(?=\\s+(?:Urteil|Entscheid|Beschluss|vom)\\b|[.,;]|$)`, 'i'),
+  ];
+  for (const rx of courtTextPatterns) {
+    const m = t.match(rx);
+    if (m && m[1]) {
+      const canton = normalizeWhitespace(m[1]).replace(/[.,;:].*$/, '').trim();
+      const suffix = cantonMap[canton];
+      if (suffix) return `${match.label} ${suffix}`;
+    }
+  }
+
+  return match.label;
 }
 
 function normalizeSwissDate(day, month, year) {
