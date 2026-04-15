@@ -391,6 +391,13 @@ function formatBVGECitation(data) {
 
 function formatMaterialCitation(data, variant = 'full') {
   const art = data.art || '';
+
+  // Neues Votum-Format (6. Aufl., Ziff. 5.3)
+  if (art === 'Votum') {
+    return ensurePeriod(`Votum ${data.abVotant}, Amtl. Bull. ${data.abRat} ${data.abJahr} S. ${data.abSpalte}`);
+  }
+
+  // Altes Amtl. Bull. Format (rückwärtskompatibel)
   if (art.startsWith('Amtl. Bull.')) {
     let out = `${art} ${data.abJahr} ${data.abSpalte}`;
     if (data.abVotant) out += ` (${data.abVotant})`;
@@ -404,8 +411,16 @@ function formatMaterialCitation(data, variant = 'full') {
   }
 
   let out = `${art} ${data.titel} vom ${data.datum}`;
-  if (data.bblJahr && data.bblSeite) out += `, BBl ${data.bblJahr} S. ${data.bblSeite} ff.`;
-  else if (data.bblJahr) out += `, BBl ${data.bblJahr}`;
+  // BBl-Format je nach Jahr (Ziff. 5.2):
+  // bis 2020:  BBl Jahr S. Seite ff.
+  // ab 2021:   BBl Jahr Ordnungsnummer  (kein "S.", kein "ff.")
+  if (data.bblJahr && data.bblOrdnr) {
+    out += `, BBl ${data.bblJahr} ${data.bblOrdnr}`;
+  } else if (data.bblJahr && data.bblSeite) {
+    out += `, BBl ${data.bblJahr} S. ${data.bblSeite} ff.`;
+  } else if (data.bblJahr) {
+    out += `, BBl ${data.bblJahr}`;
+  }
   if (data.stichwort) out += ` (zit. ${data.stichwort})`;
   return ensurePeriod(out);
 }
@@ -447,9 +462,15 @@ function parseBGerCitation(text) {
 
 function parseBVGECitation(text) {
   const clean = stripTrailingPeriod(text);
-  const bvge = clean.match(/^BVGE\s+(\d+(?:\/\d+)?)(?:\s+E\.\s*([\dA-Za-z.]+))?$/i);
-  if (bvge) {
-    return { art: 'BVGE', geschaeft: bvge[1], datum: '', erwaegung: bvge[2] || '' };
+  // Alt-Format bis 2013: BVGE 2007/1
+  const bvgeAlt = clean.match(/^BVGE\s+(\d{4}\/\d+)(?:\s+E\.\s*([\dA-Za-z.]+))?$/i);
+  if (bvgeAlt) {
+    return { art: 'BVGE', geschaeft: bvgeAlt[1], datum: '', erwaegung: bvgeAlt[2] || '' };
+  }
+  // Neu-Format ab 2014: BVGE 2019 IV/3 (mit Rechtsgebiet I–VI)
+  const bvgeNeu = clean.match(/^BVGE\s+(\d{4})\s+(I{1,3}V?|VI|IV|V)\s*\/\s*(\d+)(?:\s+E\.\s*([\dA-Za-z.]+))?$/i);
+  if (bvgeNeu) {
+    return { art: 'BVGE', geschaeft: `${bvgeNeu[1]} ${bvgeNeu[2].toUpperCase()}/${bvgeNeu[3]}`, datum: '', erwaegung: bvgeNeu[4] || '' };
   }
   const bvger = clean.match(/^BVGer\s+([A-Z]-\d+\/\d{4})(?:\s+vom\s+(\d{1,2}\.\d{1,2}\.\d{4}))?(?:\s+E\.\s*([\dA-Za-z.]+))?$/i);
   if (bvger) {
@@ -460,6 +481,20 @@ function parseBVGECitation(text) {
 
 function parseMaterialCitation(text) {
   const clean = stripTrailingPeriod(text);
+
+  // Neues Votum-Format (Ziff. 5.3, 6. Aufl.): Votum Nachname Vorname, Amtl. Bull. NR|SR Jahr S. Seite
+  const votum = clean.match(/^Votum\s+([A-ZÄÖÜ][a-zäöüß]+(?:\s+[A-ZÄÖÜ][a-zäöüß]+)*),\s*Amtl\.\s*Bull\.\s*(NR|SR)\s+(\d{4})\s+S\.\s*(\d+)$/i);
+  if (votum) {
+    return {
+      art: 'Votum',
+      abVotant: normalizeWhitespace(votum[1]),
+      abRat: votum[2].toUpperCase(),
+      abJahr: votum[3],
+      abSpalte: votum[4],
+    };
+  }
+
+  // Altes Amtl. Bull. Format: Amtl. Bull. NR 2009 1234 (Müller)
   const ab = clean.match(/^Amtl\.\s*Bull\.\s*(NR|SR)\s+(\d{4})\s+(\d+)(?:\s*\(([^)]+)\))?$/i);
   if (ab) {
     return {
@@ -469,15 +504,24 @@ function parseMaterialCitation(text) {
       abVotant: ab[4] || '',
     };
   }
-  const m = clean.match(/^(Botschaft|Bericht|Vernehmlassung)\s+(.+?)\s+vom\s+([^,]+)(?:,\s*BBl\s+(\d{4})(?:\s+S\.\s*(\d+)\s*ff\.)?)?(?:\s*\(zit\.\s*([^)]+)\))?$/i);
+
+  // Botschaft/Bericht/Vernehmlassung — zwei BBl-Formate:
+  // 1998–2020: BBl 2009 S. 5975 ff.
+  // ab 2021:   BBl 2022 1252  (Ordnungsnummer, keine Seitenzahl)
+  const m = clean.match(/^(Botschaft|Bericht|Vernehmlassung)\s+(.+?)\s+vom\s+([^,]+)(?:,\s*BBl\s+(\d{4})(?:\s+(?:S\.\s*(\d+)\s*ff\.?|(\d{4,}))))?(?:\s*\(zit\.\s*([^)]+)\))?$/i);
   if (!m) return null;
+  const bblJahr = m[4] || '';
+  // m[5] = Seite (altes Format), m[6] = Ordnungsnummer (neues Format ab 2021)
+  const bblSeite = m[5] || '';
+  const bblOrdnr = m[6] || '';
   return {
     art: m[1],
     titel: normalizeWhitespace(m[2]),
     datum: normalizeWhitespace(m[3]),
-    bblJahr: m[4] || '',
-    bblSeite: m[5] || '',
-    stichwort: m[6] || '',
+    bblJahr,
+    bblSeite,
+    bblOrdnr,  // Ordnungsnummer ab 2021 (z.B. "1252")
+    stichwort: m[7] || '',
     seite: '',
   };
 }
@@ -538,6 +582,11 @@ function updateOutputLabels(type) {
     kurzLabel.textContent = '🔖 Kurzangabe — Fussnote';
     return;
   }
+  if (type === 'ki') {
+    vollLabel.textContent = '🤖 KI-Fundstelle — nur Fussnote (kein Verzeichnis, Ziff. 6.2)';
+    kurzLabel.textContent = '— KI-Texte haben kein Kurzzitat';
+    return;
+  }
   vollLabel.textContent = '📖 Vollzitat — Literaturverzeichniseintrag';
   kurzLabel.textContent = '🔖 Kurzangabe — Fussnote';
 }
@@ -557,11 +606,12 @@ function copyText(spanId, btn) {
 
 function matArtChanged() {
   const art = (document.getElementById('mat_art') || {}).value || '';
-  const isAB = art.startsWith('Amtl. Bull.');
+  // 6. Aufl.: "Votum NR" / "Votum SR" statt "Amtl. Bull."
+  const isVotum = art.startsWith('Votum') || art.startsWith('Amtl. Bull.');
   const def = document.getElementById('matFieldsDefault');
   const ab  = document.getElementById('matFieldsAB');
-  if (def) def.style.display = isAB ? 'none' : '';
-  if (ab)  ab.style.display  = isAB ? '' : 'none';
+  if (def) def.style.display = isVotum ? 'none' : '';
+  if (ab)  ab.style.display  = isVotum ? '' : 'none';
 }
 
 function addAuthor(listId = 'authorsList', l1 = 'Nachname', l2 = 'Vorname') {
@@ -1057,20 +1107,21 @@ const FORMS = {
   },
 
   // ── Materialien ────────────────────────────────────────────────
-  // ZitierGuide S. 19–20: Botschaften, Berichte, Parlamentsprotokolle → Materialienverzeichnis
-  // Format: Botschaft [Titel] vom [Datum], BBl [Jahr] S. [Seite] ff. (zit. [Stichwort])
+  // ZitierGuide Ziff. 5 (6. Aufl.): Botschaften, Berichte → Materialienverzeichnis
+  // BBl-Format: bis 2020: BBl Jahr S. Seite ff. | ab 2021: BBl Jahr Ordnungsnummer
+  // Voten (Ziff. 5.3, 6. Aufl.): Votum Nachname Vorname, Amtl. Bull. NR|SR Jahr S. Seite
   materialien: {
     html: () => `
       <p style="font-size:0.85em;color:var(--muted);margin-bottom:18px;background:#f0ede5;padding:10px 14px;border-radius:7px;">
-        Materialien (Botschaften, Berichte etc.) gehören ins <strong>Materialienverzeichnis</strong>, nicht ins Literaturverzeichnis (ZitierGuide S. 19–20).
+        Materialien (Botschaften, Berichte etc.) gehören ins <strong>Materialienverzeichnis</strong> (ZitierGuide Ziff. 5). Voten erscheinen nur in der Fussnote.
       </p>
       <div class="form-group"><div class="form-label required">Art</div>
         <select id="mat_art" onchange="matArtChanged()" style="padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:0.95em;width:100%">
           <option value="Botschaft">Botschaft</option>
           <option value="Bericht">Bericht</option>
           <option value="Vernehmlassung">Vernehmlassung</option>
-          <option value="Amtl. Bull. NR">Amtliches Bulletin NR</option>
-          <option value="Amtl. Bull. SR">Amtliches Bulletin SR</option>
+          <option value="Votum NR">Votum (Nationalrat) — nur Fussnote</option>
+          <option value="Votum SR">Votum (Ständerat) — nur Fussnote</option>
         </select>
       </div>
       <!-- Botschaft/Bericht/Vernehmlassung fields -->
@@ -1081,53 +1132,61 @@ const FORMS = {
           <div class="form-group"><div class="form-label required">Datum (ausgeschrieben)</div>
             <input type="text" id="datum" placeholder="z.B. 26. August 2009"></div>
           <div class="form-group"><div class="form-label">BBl-Jahr <span class="optional">(opt.)</span></div>
-            <input type="text" id="bbl_jahr" placeholder="z.B. 2009"></div>
-          <div class="form-group"><div class="form-label">BBl-Seite <span class="optional">(opt.)</span></div>
-            <input type="text" id="bbl_seite" placeholder="z.B. 5975"></div>
+            <input type="text" id="bbl_jahr" placeholder="z.B. 2022"></div>
+          <div class="form-group"><div class="form-label">BBl-Fundstelle <span class="optional">(opt.)</span></div>
+            <input type="text" id="bbl_seite" placeholder="bis 2020: 5975 | ab 2021: 1252"></div>
         </div>
+        <p style="font-size:0.8em;color:var(--muted);margin:-10px 0 14px;padding:8px 12px;background:var(--bg-alt,#f8f5ee);border-radius:6px;">
+          <strong>BBl-Format:</strong> 1998–2020 → Seite (z.B. 5975), ab 2021 → Ordnungsnummer (z.B. 1252). Ab 2021 wird «S.» und «ff.» weggelassen.
+        </p>
         <div class="section-divider"></div>
         <div class="section-title">Für Fussnote</div>
         <div class="row">
           <div class="form-group"><div class="form-label required">Stichwort (Kurzzitat)</div>
-            <input type="text" id="stichwort" placeholder="z.B. Kampfflugzeuge"></div>
-          <div class="form-group"><div class="form-label">Konkrete Seite</div>
-            <input type="text" id="seite" placeholder="z.B. 5980"></div>
+            <input type="text" id="stichwort" placeholder="z.B. Botschaft Tonnagesteuer"></div>
+          <div class="form-group"><div class="form-label">Konkrete Seite / Stelle</div>
+            <input type="text" id="seite" placeholder="z.B. 5980 oder S. 8"></div>
         </div>
       </div>
-      <!-- Amtliches Bulletin (AB) fields -->
+      <!-- Votum fields (6. Aufl., Ziff. 5.3) -->
       <div id="matFieldsAB" style="display:none">
         <p style="font-size:0.82em;color:var(--muted);background:#f0ede5;padding:10px 14px;border-radius:7px;margin-bottom:12px">
-          Format: <strong>Amtl. Bull. NR 2009 1234 (Votant).</strong> — Amtliches Bulletin erscheint nicht im Materialienverzeichnis, sondern nur in der Fussnote.
+          Format (6. Aufl.): <strong>Votum Nachname Vorname, Amtl. Bull. NR 2025 S. 42.</strong><br>
+          Voten erscheinen nicht im Materialienverzeichnis, sondern nur in der Fussnote (Ziff. 5.3).
         </p>
+        <div class="form-group"><div class="form-label required">Nachname und Vorname (Parlamentsmitglied)</div>
+          <input type="text" id="ab_votant" placeholder="z.B. Suter Gabriela"></div>
         <div class="row">
           <div class="form-group"><div class="form-label required">Jahr der Session</div>
-            <input type="text" id="ab_jahr" placeholder="z.B. 2009"></div>
-          <div class="form-group"><div class="form-label required">Spalte / Seite</div>
-            <input type="text" id="ab_spalte" placeholder="z.B. 1234"></div>
+            <input type="text" id="ab_jahr" placeholder="z.B. 2025"></div>
+          <div class="form-group"><div class="form-label required">Seite im Amtl. Bull.</div>
+            <input type="text" id="ab_spalte" placeholder="z.B. 42"></div>
         </div>
-        <div class="form-group"><div class="form-label">Votant (Redner/Rednerin)</div>
-          <input type="text" id="ab_votant" placeholder="z.B. Müller"></div>
       </div>
       <button class="btn-generate" onclick="generate()">Zitat generieren</button>
       <p class="required-legend"><span>*</span> Pflichtfeld</p>`,
     generate: () => {
       const art=val('mat_art');
-      const isAB = art.startsWith('Amtl. Bull.');
-      if (isAB) {
-        const abJahr=val('ab_jahr'); const abSpalte=val('ab_spalte'); const abVotant=val('ab_votant');
-        if (!abJahr||!abSpalte) { alert('Bitte Jahr und Spalte/Seite ausfüllen.'); return; }
-        const fT = formatMaterialCitation({ art, abJahr, abSpalte, abVotant }, 'full');
+      const isVotum = art.startsWith('Votum');
+      if (isVotum) {
+        const abVotant=val('ab_votant'); const abJahr=val('ab_jahr'); const abSpalte=val('ab_spalte');
+        if (!abVotant||!abJahr||!abSpalte) { alert('Bitte Name, Jahr und Seite ausfüllen.'); return; }
+        const abRat = art === 'Votum NR' ? 'NR' : 'SR';
+        const fT = formatMaterialCitation({ art: 'Votum', abVotant, abRat, abJahr, abSpalte }, 'full');
         showOutput(esc(fT),fT,esc(fT),fT);
       } else {
         const titel=val('titel'); const datum=val('datum');
-        const bblJ=val('bbl_jahr'); const bblS=val('bbl_seite');
+        const bblJ=val('bbl_jahr'); const bblRaw=val('bbl_seite');
         const sw=val('stichwort'); const seite=val('seite');
         if (!titel||!datum) { alert('Bitte Titel und Datum ausfüllen.'); return; }
-        const data = { art, titel, datum, bblJahr: bblJ, bblSeite: bblS, stichwort: sw, seite };
+        // Ab 2021 = Ordnungsnummer (kein "S.", kein "ff.")
+        const isPost2021 = bblJ && parseInt(bblJ) >= 2021;
+        const bblSeite = isPost2021 ? '' : bblRaw;
+        const bblOrdnr = isPost2021 ? bblRaw : '';
+        const data = { art, titel, datum, bblJahr: bblJ, bblSeite, bblOrdnr, stichwort: sw, seite };
         const fT = formatMaterialCitation(data, 'full');
         const kT = formatMaterialCitation(data, 'short');
-        const fH=esc(fT);
-        showOutput(fH,fT,esc(kT),kT);
+        showOutput(esc(fT),fT,esc(kT),kT);
       }
     }
   },
@@ -1217,6 +1276,44 @@ const FORMS = {
       if(seite) kT+=seite.startsWith('N')?`, ${seite}`:`, S. ${seite}`;
       kT+='.';
       showOutput(fH,fT,kH,kT);
+    }
+  },
+
+  // ── KI-Tools (neu in 6. Aufl., Ziff. 6.2) ─────────────────────
+  // Format: Betreiber, KI-Tool (Modell), URL, besucht am: Datum. Prompt: [Text oder «Prompt: siehe Anhang»].
+  // KI-Texte sind weder zitierfähig noch zitierwürdig — kein Verzeichniseintrag.
+  ki: {
+    html: () => `
+      <div style="background:#fff3cd;border:1.5px solid #e6ac00;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.86em;color:#5c4b00;">
+        <strong>⚠️ KI-Texte sind gemäss ZitierGuide Ziff. 6.2 (6. Aufl.) weder zitierfähig noch zitierwürdig.</strong><br>
+        Sie dürfen nicht als juristische Literatur zitiert werden und erscheinen in keinem Verzeichnis. Die Fundstelle gehört nur in die Fussnote.
+      </div>
+      <div class="form-group"><div class="form-label required">Betreiber des KI-Tools</div>
+        <input type="text" id="ki_betreiber" placeholder="z.B. Anthropic / OpenAI / Microsoft"></div>
+      <div class="row">
+        <div class="form-group"><div class="form-label required">Name des KI-Tools</div>
+          <input type="text" id="ki_tool" placeholder="z.B. Claude / ChatGPT / Copilot"></div>
+        <div class="form-group"><div class="form-label">Modell <span class="optional">(falls ersichtlich)</span></div>
+          <input type="text" id="ki_modell" placeholder="z.B. claude-opus-4-5 / GPT-4o"></div>
+      </div>
+      <div class="form-group"><div class="form-label required">URL des Tools</div>
+        <input type="text" id="ki_url" placeholder="z.B. https://claude.ai"></div>
+      <div class="form-group"><div class="form-label required">Datum des Abrufs</div>
+        <input type="text" id="ki_datum" placeholder="z.B. 15.04.2026"></div>
+      <div class="form-group"><div class="form-label required">Prompt</div>
+        <input type="text" id="ki_prompt" placeholder="Exakter Prompttext — oder: «Prompt: siehe Anhang»"></div>
+      <button class="btn-generate" onclick="generate()">Zitat generieren</button>
+      <p class="required-legend"><span>*</span> Pflichtfeld</p>`,
+    generate: () => {
+      const betreiber=val('ki_betreiber'); const tool=val('ki_tool'); const modell=val('ki_modell');
+      const url=val('ki_url'); const datum=val('ki_datum'); const prompt=val('ki_prompt');
+      if (!betreiber||!tool||!url||!datum||!prompt) { alert('Bitte alle Pflichtfelder ausfüllen.'); return; }
+      const toolStr = modell ? `${tool} (${modell})` : tool;
+      const fT = `${betreiber}, ${toolStr}, ${url}, besucht am: ${datum}. Prompt: ${prompt}.`;
+      const fH = `${esc(betreiber)}, ${esc(toolStr)}, ${esc(url)}, besucht am: ${esc(datum)}. Prompt: ${esc(prompt)}.`;
+      // Kein Kurzzitat für KI-Texte (erscheinen nur in Fussnote)
+      const kT = `— KI-Texte haben kein Kurzzitat (nur Fussnote, kein Verzeichnis).`;
+      showOutput(fH, fT, esc(kT), kT);
     }
   }
 };

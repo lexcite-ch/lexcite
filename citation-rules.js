@@ -2,21 +2,29 @@ function detectTypeFromText(text) {
   const t = text.trim();
   if (/^BGE\s+\d+\s+(I{1,3}|IV|VI{0,3}|V)\s+\d+/.test(t)) return 'bge';
   if (/^BGer\s+\d+[A-Z]+[._]\d+\/\d{4}/.test(t) || /^Urteil des Bundesgerichts/.test(t)) return 'bger';
+  // BVGE: auch neues Format mit Rechtsgebiet (z.B. BVGE 2019 IV/3) ab 2014
   if (/^BVGE\s+\d+/.test(t) || /^BVGer\s+[A-Z]-\d+/.test(t)) return 'bvge';
   const kantonalCourts = ['KGer','OGer','AGer','HGer','VGer','StGer','AGVE','ZR','JAR','ARV','SozGer'];
   if (kantonalCourts.some(c => t.startsWith(c)) || /\bEntscheid vom\b/.test(t)) return 'kantonal';
-  if (/^(Botschaft|Bericht|Vernehmlassung)\b/.test(t) || /^Amtl\.\s*Bull\.\s*(NR|SR)\b/.test(t) || /,\s*BBl\s+\d{4}\s*S\.\s*\d+/i.test(t)) return 'materialien';
+  // Materialien: Botschaft/Bericht/Vernehmlassung, Amtl. Bull., Voten (6. Aufl.), BBl (alt S. und neu Ordnungsnr.)
+  if (/^(Botschaft|Bericht|Vernehmlassung)\b/.test(t)
+    || /^Votum\s+[A-ZÄÖÜ]/.test(t)
+    || /^Amtl\.\s*Bull\.\s*(NR|SR)\b/.test(t)
+    || /,\s*BBl\s+\d{4}\s*S\.\s*\d+/i.test(t)
+    || /,\s*BBl\s+\d{4}\s+\d{4,}/i.test(t)) return 'materialien'; // neue Ordnungsnummer ab 2021
   if (/(^|,\s*)(SR|LS|SAR|BSG)\s*\d/.test(t) || /^Art\.\s*\d+[a-z]?(?:\s+Abs\.\s*\d+)?(?:\s+lit\.\s*[a-z])?\s+[A-Z]{2,}/.test(t)) return 'gesetz';
   if (/\b(?:Diss\.|Habil\.)/.test(t)) return 'dissertation';
+  // KI-Tools (Ziff. 6.2, neu 6. Aufl.): Betreiber + KI-Tool + Prompt
+  if (/\bPrompt[:\s]/i.test(t) && /(https?:\/\/|www\.)/.test(t)) return 'ki';
   if (/(https?:\/\/|www\.)/.test(t) || /besucht am:/i.test(t)) return 'internet';
   if (/\bin:\s/.test(t) && !/[Kk]ommentar\s+zu\s+Art/.test(t)) return 'sammelband';
   if (/[Kk]ommentar\s+zu\s+Art|N\s+\d+/.test(t)) return 'kommentar';
-  const journals = ['AJP','ZSR','ZBJV','SJZ','BJM','HAVE','SZZP','Jusletter','plädoyer','ZBl','BaK','ZWR','SHK','BSK','recht','ZZZ'];
+  const journals = ['AJP','ZSR','ZBJV','SJZ','BJM','HAVE','SZZP','Jusletter','plädoyer','ZBl','BaK','ZWR','SHK','BSK','recht','ZZZ','sui generis','GesKR','REPRAX'];
   if (journals.some(j => new RegExp('\\b' + j + '\\b').test(t))) return 'zeitschrift';
   return 'monographie';
 }
 
-// ── Format templates (ZitierGuide 5. Aufl.) ──────────────────
+// ── Format templates (ZitierGuide 6. Aufl. – Müller/Sieber/Züllig) ──────────────────
 const FORMAT_TEMPLATES = {
   bge: {
     voll: 'BGE [Band] [Abt.] [Seite], [Fundstelle] [f./ff.]',
@@ -39,34 +47,44 @@ const FORMAT_TEMPLATES = {
     verz: '[Gericht] [Datum], [Aktenzeichen], [Publikation] [Band/Jahr] [Seite]',
   },
   monographie: {
-    voll: 'NACHNAME Vorname, Titel, [Aufl.], Ort Jahr, S. [Seite]',
+    // Ziff. 2.2 (6. Aufl.): Verlagsname wird nicht angegeben. DOI falls vorhanden.
+    voll: 'NACHNAME Vorname, Titel, [A.], Ort Jahr, S. [Seite][. DOI: https://doi.org/...]',
     kurz: 'NACHNAME, [Stichwort,] S. [Seite]',
-    verz: 'NACHNAME Vorname, Titel, [Aufl.], Ort Jahr.',
+    verz: 'NACHNAME Vorname, Titel, [A.], Ort Jahr[. DOI: https://doi.org/...]',
   },
   dissertation: {
+    // Ziff. 2.2: Schriftenreihe wird nicht angegeben. Ab 2. Aufl.: «A.» (nicht «Aufl.»).
     voll: 'NACHNAME Vorname, Titel[, Untertitel], Diss./Habil. UniOrt, Ort Jahr, S. [Seite]',
     kurz: 'NACHNAME, [Stichwort,] S. [Seite]',
     verz: 'NACHNAME Vorname, Titel[, Untertitel], Diss./Habil. UniOrt, Ort Jahr.',
   },
   zeitschrift: {
-    voll: 'NACHNAME Vorname, Aufsatztitel, Zeitschrift [Band/Jahr] [Seite ff.], [Fundstelle]',
-    kurz: 'NACHNAME, Aufsatztitel, Zeitschrift [Band/Jahr] [Seite]',
-    verz: 'NACHNAME Vorname, Aufsatztitel, Zeitschrift [Band/Jahr] [Seite ff.]',
+    // Ziff. 2.3 (6. Aufl.): DOI falls vorhanden. Bei Online-Zeitschriften: PDF-Fassung.
+    voll: 'NACHNAME Vorname, Aufsatztitel, Zeitschrift [Jahr] S. [Seite ff.], [Fundstelle][. DOI: https://doi.org/...]',
+    kurz: 'NACHNAME, [Stichwort,] Zeitschrift [Jahr] S. [Seite]',
+    verz: 'NACHNAME Vorname, Aufsatztitel, Zeitschrift [Jahr] S. [Seite ff.][. DOI: https://doi.org/...]',
   },
   kommentar: {
-    voll: 'NACHNAME Vorname, in: HRSG Vorname (Hrsg.), Kommentartitel, [Teilband], [Aufl.], Ort Jahr. / NACHNAME Vorname, Kommentartitel (selbständig), [Aufl.], Ort Jahr.',
+    // Ziff. 2.5 (6. Aufl.): Herausgeber der Kommentarreihe werden nicht genannt. DOI falls vorhanden.
+    voll: 'NACHNAME Vorname, in: HRSG Vorname (Hrsg.), Kommentartitel, [Teilband], [A.], Ort Jahr[. DOI: ...]',
     kurz: 'NACHNAME, Art. [X] [Gesetz] N [Rz.]',
-    verz: 'NACHNAME Vorname, in: HRSG Vorname (Hrsg.), Kommentartitel, [Teilband], [Aufl.], Ort Jahr.',
+    verz: 'NACHNAME Vorname, in: HRSG Vorname (Hrsg.), Kommentartitel, [Teilband], [A.], Ort Jahr[. DOI: ...]',
   },
   sammelband: {
-    voll: 'NACHNAME Vorname, Beitragstitel, in: HRSG Vorname (Hrsg.), Bandtitel, [Aufl.], Ort Jahr, S. [Seite ff.], [Fundstelle]',
-    kurz: 'NACHNAME, Beitragstitel, S. [Seite]',
-    verz: 'NACHNAME Vorname, Beitragstitel, in: HRSG Vorname (Hrsg.), Bandtitel, [Aufl.], Ort Jahr, S. [Seite ff.]',
+    // Ziff. 2.4 (6. Aufl.): DOI falls vorhanden.
+    voll: 'NACHNAME Vorname, Beitragstitel, in: HRSG Vorname (Hrsg.), Bandtitel, [A.], Ort Jahr, S. [Seite ff.][. DOI: ...], [Fundstelle]',
+    kurz: 'NACHNAME, [Beitragstitel,] S. [Seite]',
+    verz: 'NACHNAME Vorname, Beitragstitel, in: HRSG Vorname (Hrsg.), Bandtitel, [A.], Ort Jahr, S. [Seite ff.][. DOI: ...]',
   },
   materialien: {
-    voll: 'Botschaft/Bericht [Titel] vom [Datum], BBl [Jahr] S. [Seite] ff. (zit. [Stichwort]) / Amtl. Bull. NR|SR [Jahr] [Seite] ([Votant])',
-    kurz: 'Botschaft/Bericht [Stichwort], S. [Seite] / Amtl. Bull. NR|SR [Jahr] [Seite] ([Votant])',
-    verz: 'Botschaft/Bericht [Titel] vom [Datum], BBl [Jahr] S. [Seite] ff. (zit. [Stichwort])',
+    // BBl-Format je nach Jahr (Ziff. 5.2):
+    // bis 1997:     BBl [Jahr] [Band röm.] S. [Seite] ff.
+    // 1998–2020:    BBl [Jahr] S. [Seite] ff.
+    // ab 2021:      BBl [Jahr] [Ordnungsnummer]  (keine Seitenzahl, nur Dok-Nr.)
+    // Voten (Ziff. 5.3, neu 6. Aufl.): Votum [Nachname] [Vorname], Amtl. Bull. NR|SR [Jahr] S. [Seite]
+    voll: 'Botschaft [Titel] vom [Datum], BBl [Jahr] S. [Seite] ff. (zit. [Stichwort])  |  ab 2021: BBl [Jahr] [Ordnungsnummer]  |  Votum [Nachname] [Vorname], Amtl. Bull. NR|SR [Jahr] S. [Seite]',
+    kurz: 'Botschaft [Stichwort], S. [Seite]  |  Votum [Nachname], Amtl. Bull. NR|SR [Jahr] S. [Seite]',
+    verz: 'Botschaft [Titel] vom [Datum], BBl [Jahr] S. [Seite] ff. (zit. [Stichwort])  |  ab 2021: BBl [Jahr] [Ordnungsnummer]',
   },
   gesetz: {
     voll: '[Vollständiger Erlasstitel] vom [Datum] ([Kurztitel]), SR/LS/... [Nr.]',
@@ -74,9 +92,16 @@ const FORMAT_TEMPLATES = {
     verz: '[Vollständiger Erlasstitel] vom [Datum] ([Kurztitel]), SR/LS/... [Nr.]',
   },
   internet: {
-    voll: 'NACHNAME Vorname, Titel, Websitename, [TT.MM.JJJJ], [URL], besucht am [TT.MM.JJJJ]',
+    voll: 'NACHNAME Vorname, Titel, [TT.MM.JJJJ], [URL], besucht am: [TT.MM.JJJJ]',
     kurz: 'NACHNAME, N [Randziffer] / S. [Seite] / [Ziff./Überschrift]',
-    verz: 'NACHNAME Vorname, Titel, Websitename, [TT.MM.JJJJ], [URL], besucht am [TT.MM.JJJJ]',
+    verz: 'NACHNAME Vorname, Titel, [TT.MM.JJJJ], [URL], besucht am: [TT.MM.JJJJ]',
+  },
+  // Ziff. 6.2 (neu in 6. Aufl.): KI-Tools sind weder zitierfähig noch zitierwürdig.
+  // Texte von generativen Sprachmodellen gehören nicht ins Verzeichnis, nur in die Fussnote.
+  ki: {
+    voll: 'Betreiber, KI-Tool (Modell), [URL], besucht am: [TT.MM.JJJJ]. Prompt: [Prompttext oder «Prompt: siehe Anhang»].',
+    kurz: '— KI-Texte werden nur in der Fussnote angegeben (kein Kurzzitat)',
+    verz: '— KI-Texte erscheinen in keinem Verzeichnis',
   },
 };
 
@@ -192,16 +217,23 @@ const GUIDE_RULES = {
         return issues;
       }
       if (!parsed) {
-        issues.push('⚠️ Format nicht erkannt — erwartet z.B. <strong>Botschaft ... vom [Datum], BBl [Jahr] S. [Seite] ff. (zit. [Stichwort])</strong> oder <strong>Amtl. Bull. NR/SR [Jahr] [Seite]</strong>.');
+        issues.push('⚠️ Format nicht erkannt — erwartet z.B. <strong>Botschaft ... vom [Datum], BBl [Jahr] S. [Seite] ff. (zit. [Stichwort])</strong> oder ab 2021: <strong>BBl [Jahr] [Ordnungsnummer]</strong> oder Voten: <strong>Votum [Nachname] [Vorname], Amtl. Bull. NR/SR [Jahr] S. [Seite]</strong>.');
         return issues;
       }
-      if (parsed.art.startsWith('Amtl. Bull.')) {
+      // Voten-Format (Ziff. 5.3, 6. Aufl.)
+      if (parsed.art === 'Votum' || parsed.art?.startsWith('Amtl. Bull.')) {
         if (formatSel === 'verz')
-          issues.push('ℹ️ <strong>Amtl. Bull.</strong> erscheint nicht im Materialienverzeichnis, sondern nur in der Fussnote.');
+          issues.push('ℹ️ <strong>Voten / Amtl. Bull.</strong> erscheinen nicht im Materialienverzeichnis, sondern nur in der Fussnote (Ziff. 5.3).');
         return issues;
       }
-      if (!parsed.bblJahr || !parsed.bblSeite)
-        issues.push('⚠️ Bei Botschaften/Berichten fehlt die <strong>BBl-Fundstelle</strong> mit Jahr und Seite.');
+      // BBl-Fundstelle: ab 2021 Ordnungsnummer statt Seitenzahl (Ziff. 5.2)
+      if (!parsed.bblJahr) {
+        issues.push('⚠️ Bei Botschaften/Berichten fehlt die <strong>BBl-Fundstelle</strong> (Jahr und Seite bzw. Ordnungsnummer ab 2021).');
+      } else if (parsed.bblJahr >= '2021' && parsed.bblSeite && /^S\.\s*\d+/.test(parsed.bblSeite)) {
+        issues.push('ℹ️ Ab 2021 verwendet das Bundesblatt <strong>Ordnungsnummern</strong> statt Seitenzahlen, z.B. <em>BBl 2022 1252</em> (ohne «S.» und ohne «ff.»).');
+      } else if (parsed.bblJahr < '2021' && !parsed.bblSeite) {
+        issues.push('⚠️ Für Botschaften von 1998–2020 fehlt die <strong>BBl-Seite</strong> (Format: BBl [Jahr] S. [Seite] ff.).');
+      }
       if (!parsed.stichwort && formatSel !== 'kurz')
         issues.push('⚠️ Im Materialienverzeichnis sollte ein <strong>(zit. Stichwort)</strong> angegeben werden.');
       return issues;
@@ -236,6 +268,26 @@ const GUIDE_RULES = {
         issues.push('ℹ️ Im Titel ist keine klare <strong>Abkürzung / kein Kurztitel in Klammern</strong> erkennbar.');
       if (!/(SR|LS|SAR|BSG)\s*\d/.test(parsed.sr))
         issues.push('⚠️ Es fehlt die <strong>systematische Nummer</strong> wie SR, LS, SAR oder BSG.');
+      return issues;
+    },
+  },
+  // Ziff. 6.2 (neu 6. Aufl.): KI-Tools
+  ki: {
+    template(formatSel) {
+      return FORMAT_TEMPLATES.ki[formatSel] || '—';
+    },
+    issues(text, formatSel) {
+      const issues = [];
+      // KI-Texte sind weder zitierfähig noch zitierwürdig (Ziff. 6.2)
+      issues.push('ℹ️ KI-generierte Texte sind gemäss ZitierGuide Ziff. 6.2 (6. Aufl.) <strong>weder zitierfähig noch zitierwürdig</strong> — sie dürfen nicht als juristische Literatur zitiert werden.');
+      if (formatSel === 'verz')
+        issues.push('⚠️ KI-Texte erscheinen in <strong>keinem Verzeichnis</strong> (weder Literatur- noch Abkürzungsverzeichnis).');
+      if (!/besucht am:/i.test(text))
+        issues.push('⚠️ Kein «<strong>besucht am: [Datum]</strong>» — dieses Datum ist obligatorisch (Texte von KI-Tools sind nicht reproduzierbar).');
+      if (!/(https?:\/\/|www\.)/.test(text))
+        issues.push('⚠️ Keine URL — die Adresse des KI-Tools muss angegeben werden.');
+      if (!/\bPrompt[:\s]/i.test(text))
+        issues.push('⚠️ Kein Prompt angegeben — entweder den konkreten Prompt oder «Prompt: siehe Anhang» hinzufügen.');
       return issues;
     },
   },
@@ -287,7 +339,8 @@ function getIssues(text, type, formatSel = 'voll') {
   }
 
   if (type === 'zeitschrift') {
-    const journals = ['AJP','ZSR','ZBJV','SJZ','BJM','HAVE','Jusletter','plädoyer','ZBl','recht'];
+    const journals = ['AJP','ZSR','ZBJV','SJZ','BJM','HAVE','Jusletter','plädoyer','ZBl','recht',
+      'sui generis','GesKR','REPRAX','Medialex','SZW','sic!','ZBl','ex ante','SZKW','ZBI'];
     if (!journals.some(j => text.includes(j)))
       issues.push('ℹ️ Keine bekannte Zeitschriften-Abkürzung erkannt — prüfe, ob die Abkürzung dem ZitierGuide entspricht.');
   }
@@ -332,8 +385,9 @@ function regenerateBVGE(text) {
 const GUIDE_REFERENCE_CASES = [
   { id: 'bge', type: 'bge', label: 'BGE', citation: 'BGE 127 I 164 E. 3c', format: 'voll', expectIssues: 0 },
   { id: 'bger', type: 'bger', label: 'BGer', citation: 'BGer 9C_355/2023 vom 07.09.2023 E. 3.2.', format: 'voll', expectIssues: 0 },
-  { id: 'bvge', type: 'bvge', label: 'BVGE', citation: 'BVGE 2007/1 E. 3.5', format: 'voll', expectIssues: 0 },
-  { id: 'bvger', type: 'bvge', label: 'BVGer', citation: 'BVGer A-1234/2020 vom 14.02.2021 E. 2.1.', format: 'voll', expectIssues: 0 },
+  { id: 'bvge', type: 'bvge', label: 'BVGE (alt)', citation: 'BVGE 2007/1 E. 3.5', format: 'voll', expectIssues: 0 },
+  { id: 'bvge-neu', type: 'bvge', label: 'BVGE (ab 2014)', citation: 'BVGE 2019 IV/3 E. 6.2.3', format: 'voll', expectIssues: 0 },
+  { id: 'bvger', type: 'bvge', label: 'BVGer', citation: 'BVGer A-2321/2021 vom 14.03.2023 E. 2.2.1.', format: 'voll', expectIssues: 0 },
   { id: 'kantonal', type: 'kantonal', label: 'Kantonal', citation: 'Zivilgericht BS, Entscheid vom 27.9.2001, BJM 2002 S. 95 ff. E. 5a.', format: 'voll', expectIssues: 0 },
   { id: 'kantonal-zr', type: 'kantonal', label: 'Kantonal (ZR)', citation: 'Obergericht ZH, Entscheid vom 12.05.2020, ZR 119/2020 S. 45 ff. E. 3b.', format: 'voll', expectIssues: 0 },
   { id: 'monographie', type: 'monographie', label: 'Monographie', citation: 'KOLLER Alfred, Schweizerisches Obligationenrecht, Allgemeiner Teil, Grundriss des allgemeinen Schuldrechts ohne Deliktsrecht, Bd. I, 4. Aufl., Bern 2017.', format: 'verz', expectIssues: 0 },
@@ -348,9 +402,10 @@ const GUIDE_REFERENCE_CASES = [
   { id: 'sammelband-kurz', type: 'sammelband', label: 'Sammelband kurz', citation: 'HUNGER, Erlöschen von Obligationen, S. 101.', format: 'kurz', expectIssues: 0, autoDetect: false },
   { id: 'kommentar', type: 'kommentar', label: 'Kommentar', citation: 'SCHNYDER Anton K., Kommentar zu Art. 41–59a OR, in: Widmer Lüchinger Corinne/Oser David (Hrsg.), Basler Kommentar, Obligationenrecht I, Art. 1–529 OR, 7. Aufl., Basel 2019.', format: 'verz', expectIssues: 0 },
   { id: 'kommentar-kurz', type: 'kommentar', label: 'Kommentar kurz', citation: 'PORTMANN/RUDOLPH, Art. 327b OR N 16.', format: 'kurz', expectIssues: 0 },
-  { id: 'materialien', type: 'materialien', label: 'Materialien', citation: 'Botschaft zur Volksinitiative «Gegen neue Kampfflugzeuge» vom 26. August 2009, BBl 2009 S. 5975 ff. (zit. Kampfflugzeuge).', format: 'verz', expectIssues: 0 },
+  { id: 'materialien', type: 'materialien', label: 'Materialien (1998–2020)', citation: 'Botschaft zur Volksinitiative «Gegen neue Kampfflugzeuge» vom 26. August 2009, BBl 2009 S. 5975 ff. (zit. Kampfflugzeuge).', format: 'verz', expectIssues: 0 },
+  { id: 'materialien-2021', type: 'materialien', label: 'Materialien (ab 2021)', citation: 'Botschaft zum Bundesgesetz über die Tonnagesteuer auf Seeschiffen vom 4. Mai 2022, BBl 2022 1252 (zit. Botschaft Tonnagesteuer).', format: 'verz', expectIssues: 0 },
   { id: 'materialien-kurz', type: 'materialien', label: 'Materialien kurz', citation: 'Botschaft Kampfflugzeuge, S. 5980.', format: 'kurz', expectIssues: 0, autoDetect: false },
-  { id: 'amtl-bull', type: 'materialien', label: 'Amtl. Bull.', citation: 'Amtl. Bull. NR 2009 1234 (Müller).', format: 'voll', expectIssues: 0 },
+  { id: 'amtl-bull', type: 'materialien', label: 'Votum (Amtl. Bull.)', citation: 'Votum Suter Gabriela, Amtl. Bull. NR 2025 S. 42.', format: 'voll', expectIssues: 0 },
   { id: 'gesetz', type: 'gesetz', label: 'Gesetz', citation: 'Bundesgesetz über die Raumplanung vom 22. Juni 1979 (Raumplanungsgesetz, RPG), SR 700', format: 'verz', expectIssues: 0 },
   { id: 'gesetz-sar', type: 'gesetz', label: 'Gesetz (SAR)', citation: 'Gesetz über die Einwohnergemeinden vom 19. Dezember 1978 (Gemeindegesetz, GG), SAR 171.100', format: 'verz', expectIssues: 0 },
   { id: 'gesetz-kurz', type: 'gesetz', label: 'Gesetz kurz', citation: 'Art. 322d Abs. 2 OR.', format: 'kurz', expectIssues: 0 },
@@ -358,6 +413,8 @@ const GUIDE_REFERENCE_CASES = [
   { id: 'internet-kurz-ziff', type: 'internet', label: 'Internet kurz', citation: 'Bundesamt für Gesundheit, Ziff. 3.2.', format: 'kurz', expectIssues: 0, autoDetect: false },
   { id: 'internet-kurz-kapitel', type: 'internet', label: 'Internet kurz (Kapitel)', citation: 'Bundesamt für Gesundheit, Kapitel Vollzug.', format: 'kurz', expectIssues: 0, autoDetect: false },
   { id: 'internet-kurz-abschnitt', type: 'internet', label: 'Internet kurz (Abschnitt)', citation: 'Bundesamt für Gesundheit, Abschnitt Schutzkonzept.', format: 'kurz', expectIssues: 0, autoDetect: false },
+  // Ziff. 6.2 (neu 6. Aufl.): KI-Tools — nur Fussnote, kein Verzeichnis
+  { id: 'ki', type: 'ki', label: 'KI-Tool (6. Aufl.)', citation: 'Anthropic, Claude (claude-opus-4-5), https://claude.ai, besucht am: 15.04.2026. Prompt: siehe Anhang.', format: 'voll', expectIssues: 1 /* Pflicht-Hinweis «nicht zitierfähig» */ },
 ];
 
 const GUIDE_NEGATIVE_CASES = [
@@ -504,6 +561,7 @@ function renderReferenceCases() {
     if (['monographie', 'dissertation'].includes(ref.type)) return 'werke';
     if (['zeitschrift', 'sammelband', 'kommentar'].includes(ref.type)) return 'literatur';
     if (['materialien', 'gesetz'].includes(ref.type)) return 'normen';
+    if (ref.type === 'ki') return 'online';
     return 'online';
   };
   const grouped = { entscheid: [], werke: [], literatur: [], normen: [], online: [] };
@@ -515,6 +573,7 @@ function renderReferenceCases() {
       'bge',
       'bger',
       'bvge',
+      'bvge-neu',
       'bvger',
       'kantonal',
       'kantonal-zr',
@@ -537,6 +596,7 @@ function renderReferenceCases() {
     ],
     normen: [
       'materialien',
+      'materialien-2021',
       'materialien-kurz',
       'amtl-bull',
       'gesetz',
@@ -548,6 +608,7 @@ function renderReferenceCases() {
       'internet-kurz-ziff',
       'internet-kurz-kapitel',
       'internet-kurz-abschnitt',
+      'ki',
     ],
   };
   const subsectionMeta = {

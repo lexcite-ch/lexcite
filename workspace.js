@@ -921,4 +921,92 @@ document.addEventListener('DOMContentLoaded', () => {
   notifyWorkspaceSyncState();
   refreshPricingSurvey();
   maybeShowOnboarding();
+  // Extension-Import aus URL-Parametern (LexCite Chrome Extension)
+  handleExtensionImport();
 });
+
+/**
+ * Liest URL-Parameter aus einem Extension-Import (?ext=1&type=...&gericht=...&datum=...&dok=...)
+ * und füllt das Zitier-Formular automatisch vor.
+ */
+function handleExtensionImport() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('ext') !== '1') return;
+
+  const type    = p.get('type')    || 'kantonal';
+  const gericht = p.get('gericht') || '';
+  const datum   = p.get('datum')   || '';
+  const dok     = p.get('dok')     || '';
+  const pub     = p.get('pub')     || '';
+  const srcUrl  = p.get('src')     || '';
+
+  // Zur Zitieren-Seite wechseln
+  switchPage('zitieren');
+
+  // Quellentyp setzen und Formular laden
+  const sel = document.getElementById('sourceType');
+  if (!sel) return;
+  sel.value = type;
+  if (typeof onTypeChange === 'function') onTypeChange();
+
+  // Nach kurzem Delay Felder befüllen (Formular muss gerendert sein)
+  setTimeout(() => {
+    function setField(id, val) {
+      const el = document.getElementById(id);
+      if (el && val) { el.value = val; el.dispatchEvent(new Event('input')); }
+    }
+
+    if (type === 'kantonal') {
+      // Kantonales Gericht: Gericht, Datum, Fundstelle
+      setField('gericht', gericht);
+      setField('datum', datum);
+      // Publikation/Sammlung → Zeitschrift-Feld (je nach Formular-Aufbau)
+      setField('zeitschrift', pub);
+      setField('geschaeftsnummer', dok);
+    } else if (type === 'bger') {
+      setField('geschaeftsnummer', dok || gericht);
+      setField('datum', datum);
+    } else if (type === 'bge') {
+      setField('bge_zitat', dok);
+    } else if (type === 'bvge') {
+      setField('geschaeftsnummer', dok);
+      setField('datum', datum);
+    }
+
+    // Import-Banner anzeigen
+    showExtensionImportBanner(gericht, datum, dok, srcUrl);
+
+    // URL säubern (damit Browser-Refresh nicht nochmals importiert)
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
+  }, 150);
+}
+
+/** Zeigt ein kleines Banner über dem Formular: «Importiert von Swisslex» */
+function showExtensionImportBanner(gericht, datum, dok, srcUrl) {
+  const formDiv = document.getElementById('dynamicForm');
+  if (!formDiv) return;
+
+  const existing = document.getElementById('extensionImportBanner');
+  if (existing) existing.remove();
+
+  const label = [dok, gericht, datum].filter(Boolean).join(' · ');
+  const banner = document.createElement('div');
+  banner.id = 'extensionImportBanner';
+  banner.style.cssText = `
+    display:flex; align-items:center; gap:10px;
+    background:#f0f9f0; border:1.5px solid #7cb87c;
+    border-radius:8px; padding:9px 12px; margin-bottom:14px;
+    font-size:12px; color:#2e6b2e; line-height:1.4;
+  `;
+  banner.innerHTML = `
+    <span style="font-size:18px; flex-shrink:0;">✅</span>
+    <span>
+      <strong>Von Swisslex importiert</strong><br>
+      <span style="color:#555;">${label || 'Metadaten wurden vorausgefüllt'}</span>
+      ${srcUrl ? `· <a href="${srcUrl}" target="_blank" style="color:#2e6b2e;">Quelle ↗</a>` : ''}
+    </span>
+    <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#888;font-size:16px;">×</button>
+  `;
+  formDiv.insertBefore(banner, formDiv.firstChild);
+}
