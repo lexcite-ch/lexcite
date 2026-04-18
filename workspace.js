@@ -938,6 +938,8 @@ function handleExtensionImport() {
   const datum   = p.get('datum')   || '';
   const dok     = p.get('dok')     || '';
   const pub     = p.get('pub')     || '';
+  const autor   = p.get('autor')   || '';
+  const titel   = p.get('titel')   || '';
   const srcUrl  = p.get('src')     || '';
 
   // Zur Zitieren-Seite wechseln
@@ -951,30 +953,124 @@ function handleExtensionImport() {
 
   // Nach kurzem Delay Felder befüllen (Formular muss gerendert sein)
   setTimeout(() => {
-    function setField(id, val) {
+    function setField(id, v) {
       const el = document.getElementById(id);
-      if (el && val) { el.value = val; el.dispatchEvent(new Event('input')); }
+      if (el && v) { el.value = v; el.dispatchEvent(new Event('input')); }
     }
 
     if (type === 'kantonal') {
-      // Kantonales Gericht: Gericht, Datum, Fundstelle
+      // Felder: gericht, datum, zeitschrift, jahr, seite
       setField('gericht', gericht);
       setField('datum', datum);
-      // Publikation/Sammlung → Zeitschrift-Feld (je nach Formular-Aufbau)
-      setField('zeitschrift', pub);
-      setField('geschaeftsnummer', dok);
-    } else if (type === 'bger') {
-      setField('geschaeftsnummer', dok || gericht);
-      setField('datum', datum);
+      // dok kann sein:
+      //   "ARV 2023 S. 111"                 → einfaches Format
+      //   "PKG 2022 Nr. 4"                  → Nr.-Format
+      //   "NZZ Nr. 51 03.03.2025, S. 12"    → NZZ-Format mit Datum
+      //   "NZZ Nr. 93 22.04.2022, S. 11"    → gleich
+      if (dok) {
+        // 1) Zeitschrift = erstes Wort
+        const abk = dok.match(/^(\S+)/);
+        if (abk) setField('zeitschrift', abk[1]);
+
+        // 2) Jahr = erste 4-stellige Jahreszahl (auch innerhalb Datum DD.MM.YYYY)
+        const jahrM = dok.match(/\b(20\d{2}|19\d{2})\b/);
+        if (jahrM) setField('jahr', jahrM[1]);
+
+        // 3) Seite = letztes "S. N" im String (bevorzugt vor "Nr. N")
+        const allS = [...dok.matchAll(/S\.\s*(\d+)/g)];
+        if (allS.length > 0) {
+          setField('seite', allS[allS.length - 1][1]);
+        } else {
+          const nrM = dok.match(/Nr\.\s*(\d+)/);
+          if (nrM) setField('seite', nrM[1]);
+        }
+      }
+
     } else if (type === 'bge') {
-      setField('bge_zitat', dok);
-    } else if (type === 'bvge') {
-      setField('geschaeftsnummer', dok);
+      // Felder: band, teil, seite
+      // dok = "BGE 150 IV 384"
+      const m = dok.match(/^BGE\s+(\d+)\s+(I{1,3}V?|VI|IV|V)\s+(\d+)/i);
+      if (m) {
+        setField('band',  m[1]);
+        setField('teil',  m[2].toUpperCase());
+        setField('seite', m[3]);
+      }
+
+    } else if (type === 'bger') {
+      // Felder: geschaeft, datum
+      // dok = "9C_355/2023" | "BGer 9C_355/2023"
+      const geschaeft = dok.replace(/^BGer\s+/i, '').trim();
+      setField('geschaeft', geschaeft || dok);
       setField('datum', datum);
+
+    } else if (type === 'bvge') {
+      // Felder: bvge_art (select), geschaeft, datum
+      const artEl = document.getElementById('bvge_art');
+      if (artEl) {
+        artEl.value = /^BVGE/i.test(dok) ? 'BVGE' : 'BVGer';
+        artEl.dispatchEvent(new Event('change'));
+      }
+      const geschaeft = dok.replace(/^BVGE\s+|^BVGer\s+/i, '').trim();
+      setField('geschaeft', geschaeft || dok);
+      setField('datum', datum);
+
+    } else if (type === 'zeitschrift') {
+      // Felder: authorsList (.nachname/.vorname), titel, zeitschrift, jahr, seite_start
+      //
+      // Autoren-Format aus Swisslex: "Müller Roland, Pärli Kurt, Caroni Andrea"
+      // Jeder Autor: NACHNAME Vorname (letztes Wort = Vorname, Rest = Nachname)
+      if (autor) {
+        const authorStrings = autor.split(/,\s+/);
+        const list = document.getElementById('authorsList');
+        if (list) {
+          authorStrings.forEach((authorStr, i) => {
+            const parts  = authorStr.trim().split(/\s+/);
+            const vn     = parts.pop() || '';
+            const nn     = parts.join(' ');
+            let block;
+            if (i === 0) {
+              block = list.querySelector('.author-block');
+            } else {
+              block = document.createElement('div');
+              block.className = 'author-block';
+              block.innerHTML = `<div class="author-inner"><div class="fields">
+                <div class="form-group"><div class="form-label">Nachname</div>
+                  <input type="text" class="nachname"></div>
+                <div class="form-group"><div class="form-label">Vorname</div>
+                  <input type="text" class="vorname"></div>
+              </div><button class="btn-remove-author" onclick="this.closest('.author-block').remove()" title="Entfernen">×</button></div>`;
+              list.appendChild(block);
+            }
+            if (block) {
+              const nnEl = block.querySelector('.nachname');
+              const vnEl = block.querySelector('.vorname');
+              if (nnEl) nnEl.value = nn;
+              if (vnEl) vnEl.value = vn;
+            }
+          });
+        }
+      }
+
+      // Titel des Aufsatzes
+      setField('titel', titel);
+
+      // dok = "AJP 2020 S. 875" → zeitschrift=AJP, jahr=2020, seite_start=875
+      if (dok) {
+        const abk   = (dok.match(/^(\S+)/) || [])[1] || '';
+        const jahrM = (dok.match(/\b(20\d{2}|19\d{2})\b/) || [])[1] || '';
+        const allS  = [...dok.matchAll(/S\.\s*(\d+)/g)];
+        const seite = allS.length > 0
+          ? allS[allS.length - 1][1]
+          : ((dok.match(/Nr\.\s*(\d+)/) || [])[1] || '');
+        if (abk)   setField('zeitschrift', abk);
+        if (jahrM) setField('jahr',        jahrM);
+        if (seite) setField('seite_start', seite);
+      }
     }
 
     // Import-Banner anzeigen
-    showExtensionImportBanner(gericht, datum, dok, srcUrl);
+    const bannerGericht = type === 'zeitschrift' ? (autor || dok) : gericht;
+    showExtensionImportBanner(bannerGericht, datum, dok, srcUrl);
 
     // URL säubern (damit Browser-Refresh nicht nochmals importiert)
     const cleanUrl = window.location.pathname;
@@ -982,7 +1078,7 @@ function handleExtensionImport() {
   }, 150);
 }
 
-/** Zeigt ein kleines Banner über dem Formular: «Importiert von Swisslex» */
+/** Zeigt ein kleines Banner über dem Formular: «Importiert von Quelle» */
 function showExtensionImportBanner(gericht, datum, dok, srcUrl) {
   const formDiv = document.getElementById('dynamicForm');
   if (!formDiv) return;
@@ -991,6 +1087,9 @@ function showExtensionImportBanner(gericht, datum, dok, srcUrl) {
   if (existing) existing.remove();
 
   const label = [dok, gericht, datum].filter(Boolean).join(' · ');
+  const sourceLabel = srcUrl && /legalis\.ch/i.test(srcUrl)
+    ? 'Legalis'
+    : (srcUrl && /swisslex\.ch/i.test(srcUrl) ? 'Swisslex' : 'externer Quelle');
   const banner = document.createElement('div');
   banner.id = 'extensionImportBanner';
   banner.style.cssText = `
@@ -1002,7 +1101,7 @@ function showExtensionImportBanner(gericht, datum, dok, srcUrl) {
   banner.innerHTML = `
     <span style="font-size:18px; flex-shrink:0;">✅</span>
     <span>
-      <strong>Von Swisslex importiert</strong><br>
+      <strong>Von ${sourceLabel} importiert</strong><br>
       <span style="color:#555;">${label || 'Metadaten wurden vorausgefüllt'}</span>
       ${srcUrl ? `· <a href="${srcUrl}" target="_blank" style="color:#2e6b2e;">Quelle ↗</a>` : ''}
     </span>

@@ -1,0 +1,151 @@
+{
+  "helpers": [
+    {
+      "kind": "preprocessPDFText",
+      "label": "spaced letters",
+      "input": "W O L F G A N G  P O R T M A N N",
+      "expected": "WOLFGANG PORTMANN"
+    },
+    {
+      "kind": "normalizeBGerCaseNumber",
+      "label": "BGer number normalization",
+      "input": "9C.355/2023",
+      "expected": "9C_355/2023"
+    },
+    {
+      "kind": "extractDecisionDate",
+      "label": "long German date",
+      "input": "Urteil vom 7. September 2023",
+      "expected": "07.09.2023"
+    },
+    {
+      "kind": "extractDecisionDate",
+      "label": "long French date",
+      "input": "Arrêt du 7. septembre 2023",
+      "expected": "07.09.2023"
+    }
+  ],
+  "detections": [
+    {
+      "label": "BGer detection",
+      "filename": "BGer 9C_355_2023.pdf",
+      "text": "Urteil vom 7. September 2023 9C_355/2023 E. 5.2",
+      "expectedType": "bger",
+      "expectedFields": {
+        "datum": "07.09.2023",
+        "erwaegung": "5.2"
+      }
+    },
+    {
+      "label": "BGE detection",
+      "filename": "BGE-141-III-569.pdf",
+      "text": "BGE 141 III 569 E. 4.2",
+      "expectedType": "bge"
+    },
+    {
+      "label": "Materials detection",
+      "filename": "botschaft.pdf",
+      "text": "Botschaft zur Volksinitiative «Gegen neue Kampfflugzeuge» vom 26. August 2009, BBl 2009 S. 5975 ff.",
+      "expectedType": "materialien",
+      "expectedFields": {
+        "bblJahr": "2009",
+        "bblSeite": "5975"
+      }
+    },
+    {
+      "label": "Commentary detection",
+      "filename": "BSK-OR-I-Portmann-Rudolph-Art-322d.pdf",
+      "text": "Wolfgang Portmann/Roger Rudolph, Kommentar zu Art. 322d OR, in: Corinne Widmer Lüchinger, David Oser Obligationenrecht I, Basler Kommentar, 8. Aufl., Basel 2026",
+      "expectedType": "kommentar",
+      "expectedFields": {
+        "gesetz": "OR",
+        "art_von": "322d",
+        "komm_name": "Basler Kommentar",
+        "auflage": "8",
+        "jahr": "2026",
+        "orte": "Basel"
+      }
+    },
+    {
+      "label": "Amtl. Bull. detection",
+      "filename": "amtl-bull.pdf",
+      "text": "Amtl. Bull. NR 2009 1234 (Müller)",
+      "expectedType": "materialien",
+      "expectedFields": {
+        "art": "Amtl. Bull. NR",
+        "bblJahr": "2009",
+        "bblSeite": "1234",
+        "stichwort": "Müller"
+      }
+    },
+    {
+      "label": "AGer-Z filename detection",
+      "filename": "AGer-Z 2015 Nr. 7.pdf",
+      "text": "Gericht Zürich, Arbeitsgericht Publikation AGer-Z 2015 Nr. 7 Seite 12 Urteilsdatum 06.11.2015",
+      "expectedType": "kantonal",
+      "expectedFields": {
+        "zeitschrift": "AGer-Z",
+        "jahr": "2015",
+        "seite": "12",
+        "datum": "06.11.2015"
+      }
+    },
+    {
+      "label": "Handelsgericht filename detection",
+      "filename": "HG120134-O24 Beweis.pdf",
+      "text": "Handelsgericht des Kantons Zürich Urteil vom 18. Oktober 2012 E. 4.3",
+      "expectedType": "kantonal",
+      "expectedFields": {
+        "gericht": "Handelsgericht ZH",
+        "datum": "18.10.2012",
+        "jahr": "2012",
+        "erwaegung": "4.3"
+      }
+    },
+    {
+      "label": "Swisslex document field journal detection",
+      "filename": "swisslex-artikel.pdf",
+      "text": "Dokument AJP 2002 S. 669 Autor Hans Peter Walter Titel Vertrauenshaftung im Umfeld des Vertrages Seiten 669-680",
+      "expectedType": "zeitschrift",
+      "expectedFields": {
+        "zeitschrift": "AJP",
+        "jahr": "2002",
+        "seite_start": "669"
+      }
+    },
+    {
+      "label": "Swisslex sammelband metadata detection",
+      "filename": "Teil II_ Begrenzendes Recht _ Begrenzter Kündigungsschutz nach Art. 10 GlG – kurze Analyse anhand eines Ausnahme-Urteils in der Schweiz.pdf",
+      "text": "Autor Isabella Tanner Titel Teil II: Begrenzendes Recht / Begrenzter Kündigungsschutz nach Art. 10 GlG – kurze Analyse anhand eines Ausnahme-Urteils in der Schweiz Serie/Reihe LBR - Luzerner Beiträge zur Rechtswissenschaft Band/Nr. 166 Buchtitel Recht und Grenzen - Grenzen des Rechts? Junge Rechtswissenschaft Luzern Jahr 2022 Seiten 141-154 Herausgeber Karoline Eder, Isabella Tanner ISBN 978-3-7255-8462-8 Verlag Schulthess Juristische Medien AG",
+      "expectedType": "sammelband",
+      "expectedFields": {
+        "titel": "Teil II: Begrenzendes Recht / Begrenzter Kündigungsschutz nach Art. 10 GlG – kurze Analyse anhand eines Ausnahme-Urteils in der Schweiz",
+        "sb_titel": "Recht und Grenzen - Grenzen des Rechts? Junge Rechtswissenschaft Luzern",
+        "jahr": "2022",
+        "seite_start": "141"
+      }
+    },
+    {
+      "label": "Real user PDF: BGer 9C_355_2023",
+      "filename": "BGer 9C_355_2023.pdf",
+      "text": "Bundesgericht Tribunal fédéral Tribunale federale Tribunal federal 9C_355/2023 Urteil vom 7. September 2023 E. 5.2",
+      "expectedType": "bger",
+      "expectedFields": {
+        "geschaeft": "9C_355/2023",
+        "datum": "07.09.2023",
+        "erwaegung": "5.2"
+      }
+    },
+    {
+      "label": "BGer head detection with point format",
+      "filename": "entscheid.pdf",
+      "text": "BGer 4A.253/2020 Urteil vom 15. März 2021 E. 3.1",
+      "expectedType": "bger",
+      "expectedFields": {
+        "geschaeft": "4A_253/2020",
+        "datum": "15.03.2021",
+        "erwaegung": "3.1"
+      }
+    }
+  ]
+}

@@ -27,14 +27,14 @@ function detectTypeFromText(text) {
 // ── Format templates (ZitierGuide 6. Aufl. – Müller/Sieber/Züllig) ──────────────────
 const FORMAT_TEMPLATES = {
   bge: {
-    voll: 'BGE [Band] [Abt.] [Seite], [Fundstelle] [f./ff.]',
-    kurz: 'BGE [Band] [Abt.] [Seite]',
+    voll: 'BGE [Band] [Abt.] [Seite] E. [Nr.] S. [konkrete Seite] oder BGE [Band] [Abt.] [Seite] ff.',
+    kurz: 'BGE [Band] [Abt.] [Seite] E. [Nr.] S. [konkrete Seite]',
     verz: '— BGE-Entscheide stehen im Judikaturverzeichnis (kein separater Verzeichniseintrag)',
   },
   bger: {
     voll: 'BGer [Geschäftsnummer, z.B. 9C_355/2023] vom [TT.MM.JJJJ] E. [Nr.]',
-    kurz: 'BGer [Geschäftsnummer] E. [Nr.]',
-    verz: 'BGer [Geschäftsnummer] vom [TT.MM.JJJJ]',
+    kurz: 'BGer [Geschäftsnummer] vom [Datum] E. [Nr.]',
+    verz: 'BGer [Geschäftsnummer] vom [Datum]',
   },
   bvge: {
     voll: 'BVGE [Jahr/Nr.] E. [Nr.] / BVGer [Az] vom [TT.MM.JJJJ] E. [Nr.]',
@@ -141,8 +141,10 @@ const GUIDE_RULES = {
         issues.push('⚠️ Format nicht erkannt — erwartet: <strong>BGE [Band] [Röm. Abteilung] [Seite]</strong>, z.B. <em>BGE 141 III 569 E. 4.2</em>.');
       if (/BGE\s+\d+,/.test(text))
         issues.push('⚠️ Kein Komma direkt nach der Bandnummer — die Abteilung (I/II/III/IV) fehlt oder ist falsch platziert.');
-      if (parsed && !parsed.erwaegung && !/ff\./.test(text))
-        issues.push('ℹ️ Bei BGE sollte entweder die relevante Erwägung (<strong>E.</strong>) oder bei Verweis auf den ganzen Entscheid <strong>ff.</strong> angegeben werden.');
+      if (/,\s*\d+/.test(text))
+        issues.push('⚠️ Konkrete Seiten bei BGE besser mit <strong>S.</strong> angeben, nicht nur mit Komma.');
+      if (parsed && !parsed.erwaegung && !parsed.seiteKonk && !/ff\./.test(text))
+        issues.push('ℹ️ Bei BGE sollte entweder die relevante Erwägung (<strong>E.</strong>) oder eine präzise Fundstelle über <strong>S.</strong> bzw. bei Verweis auf den ganzen Entscheid <strong>ff.</strong> angegeben werden.');
       return issues;
     },
   },
@@ -152,7 +154,7 @@ const GUIDE_RULES = {
     },
     regenerate(text) {
       const parsed = parseBGerCitation(text);
-      return parsed ? formatBGerCitation(parsed) : null;
+      return parsed ? formatBGerCitation(parsed, 'full') : null;
     },
     issues(text) {
       const issues = [];
@@ -163,8 +165,6 @@ const GUIDE_RULES = {
         issues.push('ℹ️ Ausgeschriebene Bezeichnung «Urteil des Bundesgerichts» — üblicher ist die Kurzform <strong>BGer</strong>.');
       if (parsed && !parsed.datum)
         issues.push('⚠️ Bei nicht amtlich publizierten Bundesgerichtsurteilen gehört das <strong>Entscheiddatum</strong> dazu.');
-      if (/\d+[A-Z]+\.\d+\/\d{4}/.test(text))
-        issues.push('ℹ️ Die Geschäftsnummer wird in der App standardmässig mit <strong>Unterstrich</strong> vereinheitlicht, z.B. <em>9C_355/2023</em>.');
       return issues;
     },
   },
@@ -368,13 +368,13 @@ function getIssues(text, type, formatSel = 'voll') {
 // ── Try to re-generate the correct BGE citation ───────────────
 function regenerateBGE(text) {
   const parsed = parseBGECitation(text);
-  return parsed ? formatBGECitation(parsed, /,\s*\d+/.test(text) ? 'short' : 'full') : null;
+  return parsed ? formatBGECitation(parsed, 'full') : null;
 }
 
 // ── Try to re-generate the correct BGer citation ──────────────
 function regenerateBGer(text) {
   const parsed = parseBGerCitation(text);
-  return parsed ? formatBGerCitation(parsed).replace(/\.$/, '') : null;
+  return parsed ? formatBGerCitation(parsed, 'full').replace(/\.$/, '') : null;
 }
 
 function regenerateBVGE(text) {
@@ -383,8 +383,8 @@ function regenerateBVGE(text) {
 }
 
 const GUIDE_REFERENCE_CASES = [
-  { id: 'bge', type: 'bge', label: 'BGE', citation: 'BGE 127 I 164 E. 3c', format: 'voll', expectIssues: 0 },
-  { id: 'bger', type: 'bger', label: 'BGer', citation: 'BGer 9C_355/2023 vom 07.09.2023 E. 3.2.', format: 'voll', expectIssues: 0 },
+  { id: 'bge', type: 'bge', label: 'BGE', citation: 'BGE 127 I 164 E. 3c S. 171', format: 'voll', expectIssues: 0 },
+  { id: 'bger', type: 'bger', label: 'BGer', citation: 'BGer 4A_119/2023 vom 6. März 2024 E. 2.3.1.', format: 'voll', expectIssues: 0 },
   { id: 'bvge', type: 'bvge', label: 'BVGE (alt)', citation: 'BVGE 2007/1 E. 3.5', format: 'voll', expectIssues: 0 },
   { id: 'bvge-neu', type: 'bvge', label: 'BVGE (ab 2014)', citation: 'BVGE 2019 IV/3 E. 6.2.3', format: 'voll', expectIssues: 0 },
   { id: 'bvger', type: 'bvge', label: 'BVGer', citation: 'BVGer A-2321/2021 vom 14.03.2023 E. 2.2.1.', format: 'voll', expectIssues: 0 },

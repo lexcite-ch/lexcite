@@ -360,19 +360,52 @@ function formatCommentaryCitation(data, variant = 'full') {
 
 function formatBGECitation(data, variant = 'full') {
   let out = `BGE ${data.band} ${data.teil} ${data.seite}`;
-  if (variant === 'short') {
-    if (data.erwaegung) out += ` E. ${data.erwaegung}`;
-    else if (data.seiteKonk) out += `, ${data.seiteKonk}`;
+  if (data.erwaegung) {
+    out += ` E. ${data.erwaegung}`;
+    if (data.seiteKonk) out += ` S. ${data.seiteKonk}`;
     return ensurePeriod(out);
   }
-  if (data.erwaegung) out += ` E. ${data.erwaegung}`;
-  else out += ' ff.';
+  if (data.seiteKonk) {
+    out += ` S. ${data.seiteKonk}`;
+    return ensurePeriod(out);
+  }
+  if (variant === 'full') out += ' ff.';
   return ensurePeriod(out);
 }
 
-function formatBGerCitation(data) {
-  let out = `BGer ${normalizeBGerCaseNumber(data.geschaeft)}`;
-  if (data.datum) out += ` vom ${data.datum}`;
+function formatGuideDecisionDate(raw) {
+  const value = normalizeWhitespace(String(raw || ''));
+  if (!value) return '';
+
+  const monthNames = {
+    '1': 'Januar',
+    '2': 'Februar',
+    '3': 'März',
+    '4': 'April',
+    '5': 'Mai',
+    '6': 'Juni',
+    '7': 'Juli',
+    '8': 'August',
+    '9': 'September',
+    '10': 'Oktober',
+    '11': 'November',
+    '12': 'Dezember',
+  };
+
+  const numeric = value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (numeric) {
+    const day = String(Number(numeric[1]));
+    const month = monthNames[String(Number(numeric[2]))];
+    if (month) return `${day}. ${month} ${numeric[3]}`;
+  }
+
+  return value;
+}
+
+function formatBGerCitation(data, variant = 'full') {
+  const geschaeft = normalizeWhitespace(String(data.geschaeft || '')).replace(/^BGer\s+/i, '');
+  let out = `BGer ${geschaeft}`;
+  if (data.datum) out += ` vom ${formatGuideDecisionDate(data.datum)}`;
   if (data.erwaegung) out += ` E. ${data.erwaegung}`;
   return ensurePeriod(out);
 }
@@ -438,7 +471,7 @@ function formatLawCitation(data, variant = 'full') {
 
 function parseBGECitation(text) {
   const clean = stripTrailingPeriod(text);
-  const m = clean.match(/^BGE\s+(\d+)\s+(I{1,3}|IV|VI{0,3}|V)\s+(\d+)(?:\s+E\.\s*([\dA-Za-z.]+)|,\s*(\d+)|\s+ff\.)?$/i);
+  const m = clean.match(/^BGE\s+(\d+)\s+(I{1,3}|IV|VI{0,3}|V)\s+(\d+)(?:\s+E\.\s*([\dA-Za-z.]+))?(?:\s+S\.\s*(\d+)(?:\s*f{1,2}\.)?)?(?:\s+ff\.)?$/i);
   if (!m) return null;
   return {
     band: m[1],
@@ -451,11 +484,11 @@ function parseBGECitation(text) {
 
 function parseBGerCitation(text) {
   const clean = stripTrailingPeriod(text);
-  const m = clean.match(/^BGer\s+(\d+[A-Z]+[._]\d+\/\d{4})(?:\s+vom\s+(\d{1,2}\.\d{1,2}\.\d{4}))?(?:\s+E\.\s*([\dA-Za-z.]+))?$/i);
+  const m = clean.match(/^BGer\s+(\d+[A-Z]+[._]\d+\/\d{4})(?:\s+vom\s+(\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}\.\s*[A-Za-zÄÖÜäöü]+(?:\s+[A-Za-zÄÖÜäöü]+)?\s+\d{4}))?(?:\s+E\.\s*([\dA-Za-z.]+))?$/i);
   if (!m) return null;
   return {
-    geschaeft: normalizeBGerCaseNumber(m[1]),
-    datum: m[2] || '',
+    geschaeft: normalizeWhitespace(m[1]),
+    datum: normalizeWhitespace(m[2] || ''),
     erwaegung: m[3] || '',
   };
 }
@@ -983,7 +1016,7 @@ const FORMS = {
     html: () => `
       ${renderJudikaturAutofillHint('bge')}
       <p style="font-size:0.85em;color:var(--muted);margin-bottom:18px;background:#f0ede5;padding:10px 14px;border-radius:7px;">
-        Publizierte BGE: Band arabisch, Teil römisch. Keine «S.» vor der Seitenzahl.
+        Publizierte BGE: Band arabisch, Teil römisch. Bei genauer Fundstelle: <strong>E.</strong> und danach optional <strong>S.</strong> für die konkrete Seite.
       </p>
       <div class="row">
         <div class="form-group"><div class="form-label">Band (arabisch)</div>
@@ -996,7 +1029,7 @@ const FORMS = {
       <div class="row">
         <div class="form-group"><div class="form-label">Erwägung (E.) <span class="optional">(opt.)</span></div>
           <input type="text" id="erwaegung" placeholder="z.B. 3a oder 2.1"></div>
-        <div class="form-group"><div class="form-label">Weitere Seite für Fussnote <span class="optional">(opt.)</span></div>
+        <div class="form-group"><div class="form-label">Konkrete Seite (S.) <span class="optional">(opt.)</span></div>
           <input type="text" id="seite_konk" placeholder="z.B. 280"></div>
       </div>
       <button class="btn-generate" onclick="generate()">Zitat generieren</button>
@@ -1034,8 +1067,9 @@ const FORMS = {
     generate: () => {
       const g=val('geschaeft'); const d=val('datum'); const e=val('erwaegung');
       if (!g||!d) { alert('Bitte Geschäftsnummer und Datum ausfüllen.'); return; }
-      const c = formatBGerCitation({ geschaeft: g, datum: d, erwaegung: e });
-      showOutput(esc(c),c,esc(c),c);
+      const full = formatBGerCitation({ geschaeft: g, datum: d, erwaegung: e }, 'full');
+      const short = formatBGerCitation({ geschaeft: g, datum: d, erwaegung: e }, 'short');
+      showOutput(esc(full),full,esc(short),short);
     }
   },
 
