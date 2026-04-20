@@ -749,6 +749,8 @@
   <span>© 2026 LexCite &nbsp;·&nbsp; Detjon Dreshaj</span>
   <span class="footer-sep">|</span>
   <div class="footer-links">
+    <a onclick="openModal('faqModal')">FAQ</a>
+    <span class="footer-sep">·</span>
     <a onclick="openModal('impressumModal')">Impressum</a>
     <span class="footer-sep">·</span>
     <a onclick="openModal('datenschutzModal')">Datenschutz</a>
@@ -805,6 +807,46 @@
 
     <h3>Anwendbares Recht</h3>
     <p>Es gilt das Bundesgesetz über den Datenschutz der Schweizerischen Eidgenossenschaft (DSG).</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL: FAQ
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="faqModal">
+  <div class="modal-box" style="max-width:640px">
+    <button class="modal-close" onclick="closeModal('faqModal')" title="Schliessen">×</button>
+    <h2>FAQ – Häufige Fragen</h2>
+
+    <h3>Was ist LexCite?</h3>
+    <p>LexCite ist eine guide-nahe Zitierhilfe für juristische Arbeiten in der Schweiz. Das Tool hilft dir bei Vollzitaten, Kurzangaben und Verzeichniseinträgen nach schweizerischem juristischem Zitierstandard.</p>
+
+    <h3>Für wen ist LexCite gedacht?</h3>
+    <p>Für juristische Studierende und Praktikerinnen in der Schweiz, die Seminararbeiten, Projektarbeiten, Bachelor- oder Masterarbeiten schreiben und korrekte Zitate nach schweizerischem Standard benötigen.</p>
+
+    <h3>Welcher Zitierstandard wird verwendet?</h3>
+    <p>LexCite orientiert sich am <em>ZitierGuide – Leitfaden zur juristischen Zitierweise</em>, 6. Auflage (Müller/Sieber/Züllig, Schulthess, Zürich 2025). Die Formatlogik wird eigenständig umgesetzt und testgestützt weiterentwickelt.</p>
+
+    <h3>Wie funktioniert die PDF-Erkennung?</h3>
+    <p>Du kannst ein PDF direkt auf die Seite ziehen. LexCite versucht dann, Quellentyp und zentrale Angaben automatisch zu erkennen und die Felder vorzufüllen. Besonders stark ist der Flow aktuell bei BGer, BGE und Kommentaren. Die Verarbeitung erfolgt <strong>vollständig im Browser</strong> — das PDF verlässt dein Gerät nicht.</p>
+
+    <h3>Werden meine Daten gespeichert?</h3>
+    <p>Gespeicherte Quellen bleiben standardmässig <strong>lokal in deinem Browser</strong>. PDFs werden nicht an fremde Server hochgeladen. Wenn du Browserdaten löschst, können lokal gespeicherte Inhalte verloren gehen — sichere wichtige Daten deshalb über Export oder Backup.</p>
+
+    <h3>Welche Quellentypen werden unterstützt?</h3>
+    <p>Unterstützt werden aktuell unter anderem BGE, BGer, BVGE/BVGer, kantonale Entscheide, Zeitschriftenaufsätze, Monographien, Kommentare, Sammelbände, Dissertationen, Gesetzestexte, Materialien sowie KI-Tools nach Ziff. 6.2 des ZitierGuide 6. Auflage.</p>
+
+    <h3>Was tun, wenn die Erkennung nicht korrekt ist?</h3>
+    <p>Dann wähle den Quellentyp manuell aus und prüfe die automatisch erkannten Felder kurz nach. Genau solche echten Fehlfälle helfen dabei, LexCite gezielt robuster zu machen. Wenn du willst, kannst du einen Fall per E-Mail melden.</p>
+
+    <h3>Was ist die Chrome Extension?</h3>
+    <p>Mit der LexCite-Extension können Metadaten von juristischen Plattformen direkt in LexCite übernommen werden. Aktuell liegt der Fokus auf Legalis-Importen für Entscheide; weitere Plattform- und Literatur-Flows werden schrittweise ausgebaut.</p>
+
+    <h3>Ist LexCite kostenlos?</h3>
+    <p>LexCite ist derzeit testbar. Langfristig ist ein Semesterpass-Modell geplant. Ziel ist ein schlankes Produkt, das sich für echte Arbeiten lohnt, ohne unnötig kompliziert zu werden.</p>
+
+    <h3>Wie melde ich einen Fehler oder schlage eine Verbesserung vor?</h3>
+    <p>Per E-Mail an <a href="mailto:detjon-dreshaj@hotmail.com">detjon-dreshaj@hotmail.com</a>. Am hilfreichsten ist eine kurze Beschreibung der Quelle und der Ausgabe, die stattdessen erschienen ist.</p>
   </div>
 </div>
 <script src="./session.js"></script>
