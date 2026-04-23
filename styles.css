@@ -4623,12 +4623,12 @@ header p {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  margin-top: -108px;
-  margin-left: min(320px, 26vw);
+  width: min(100%, 980px);
+  margin: 0 auto;
 }
 
 .hero-eyebrow {
-  align-self: flex-start;
+  align-self: center;
   margin-left: 0;
   margin-bottom: 12px;
   color: var(--muted);
@@ -4637,7 +4637,7 @@ header p {
 .hero-title {
   width: 100%;
   max-width: 980px;
-  text-align: left;
+  text-align: center;
   font-size: clamp(4.35rem, 8.6vw, 8.1rem);
   line-height: 0.92;
   letter-spacing: -0.045em;
@@ -4645,8 +4645,8 @@ header p {
 }
 
 .hero-copy {
-  align-self: flex-start;
-  text-align: left;
+  align-self: center;
+  text-align: center;
   max-width: 760px;
   margin-bottom: 26px;
   color: #5C5248;
@@ -4655,7 +4655,7 @@ header p {
 .hero-demo {
   width: min(100%, 930px);
   max-width: 930px;
-  align-self: flex-start;
+  align-self: center;
   padding: 0;
   overflow: hidden;
   border-radius: 18px;
@@ -4756,11 +4756,12 @@ header p {
 .hero-proof-row,
 .hero-microcopy {
   width: min(100%, 930px);
-  align-self: flex-start;
+  align-self: center;
 }
 
 .hero-actions {
   margin-top: 18px;
+  justify-content: center;
 }
 
 .hero-cta-primary,
