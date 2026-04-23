@@ -391,8 +391,15 @@ function closeOnboarding() {
   if (el) {
     el.style.transition = 'opacity 0.3s';
     el.style.opacity = '0';
-    setTimeout(() => { el.style.display = 'none'; el.style.opacity = ''; el.style.transition = ''; }, 300);
+    setTimeout(() => {
+      el.style.display = 'none';
+      el.style.opacity = '';
+      el.style.transition = '';
+      window.dispatchEvent(new CustomEvent('lexcite:onboarding-closed'));
+    }, 300);
+    return;
   }
+  window.dispatchEvent(new CustomEvent('lexcite:onboarding-closed'));
 }
 
 function maybeShowOnboarding() {

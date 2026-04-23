@@ -1,4 +1,4 @@
-const LEXCITE_PRICING_SURVEY_VERSION = 'v9-semester-pass-study-program';
+const LEXCITE_PRICING_SURVEY_VERSION = 'v10-entry-questions-study-program';
 
 const LEXCITE_PRICING_SURVEY_DEFAULT = {
   version: LEXCITE_PRICING_SURVEY_VERSION,
@@ -29,6 +29,7 @@ const LexCitePricingSurvey = {
   ],
 
   state: { ...LEXCITE_PRICING_SURVEY_DEFAULT },
+  entryPromptAllowed: false,
 
   load() {
     const persisted = LexCiteStorage.getJSON(LEXCITE_STORAGE_KEYS.pricingSurvey, {}) || {};
@@ -57,8 +58,32 @@ const LexCitePricingSurvey = {
 
   shouldShow() {
     if (this.state.dismissed || this.state.choice) return false;
+    if (this.entryPromptAllowed) return true;
     const saves = this.getUsageCount();
     return saves >= 3 || (saves >= 2 && this.hasPdfUsage());
+  },
+
+  isOnboardingVisible() {
+    const onboarding = document.getElementById('onboardingModal');
+    if (!onboarding) return false;
+    return onboarding.style.display !== 'none' && getComputedStyle(onboarding).display !== 'none';
+  },
+
+  scheduleEntryPrompt() {
+    if (this.state.dismissed || this.state.choice) return;
+    window.setTimeout(() => {
+      if (this.state.dismissed || this.state.choice || this.isOnboardingVisible()) return;
+      this.entryPromptAllowed = true;
+      this.render();
+    }, 900);
+  },
+
+  showEntryPromptNow() {
+    if (this.state.dismissed || this.state.choice) return;
+    this.entryPromptAllowed = true;
+    this.state.modalClosed = false;
+    this.save();
+    this.render();
   },
 
   buildResponsePayload(value) {
@@ -165,7 +190,7 @@ const LexCitePricingSurvey = {
             <button class="pricing-survey-btn" type="button" onclick="LexCitePricingSurvey.answer('19')">19 CHF / Semester</button>
           </div>
           <div class="pricing-survey-modal-foot">
-            Die Frage erscheint erst nach echter Nutzung, damit das Signal näher an einer realen Produktentscheidung liegt.
+            Optional. Deine Antwort hilft uns, den Semesterpass realistisch einzuordnen.
             <button class="pricing-survey-dismiss" type="button" onclick="LexCitePricingSurvey.dismiss()">Jetzt nicht</button>
           </div>
         </div>
@@ -244,7 +269,7 @@ const LexCitePricingSurvey = {
 
     if (this.shouldShow()) {
       card.style.display = '';
-      intro.textContent = 'Nach ein paar echten Schritten im Tool: Welcher Semesterpass wäre für dich für LexCite noch realistisch?';
+      intro.textContent = 'Kurze Einschätzung: Welcher Semesterpass wäre für dich für LexCite noch realistisch?';
       actions.style.display = 'grid';
       result.style.display = 'none';
       result.textContent = '';
@@ -282,6 +307,7 @@ const LexCitePricingSurvey = {
   init() {
     this.load();
     this.render();
+    this.scheduleEntryPrompt();
   },
 };
 
@@ -292,6 +318,12 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('lexcite:sync-payload-change', () => {
     LexCitePricingSurvey.render();
+  });
+}
+
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('lexcite:onboarding-closed', () => {
+    window.setTimeout(() => LexCitePricingSurvey.showEntryPromptNow(), 450);
   });
 }
 
