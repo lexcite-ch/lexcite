@@ -27,31 +27,16 @@
         <div class="hero-copy">
           Bei Entscheiden frisst nicht die Fussnote Zeit, sondern das vollständige Werkzitat. LexCite bereitet Geschäftsnummer, Datum und Verzeichniseintrag direkt vor.
         </div>
-        <div class="hero-demo hero-demo-workbench" id="heroDemo" data-step="0" aria-label="Kurze Produktvorschau">
-          <div class="hero-demo-chrome">
-            <div class="hero-demo-chrome-left">
-              <span class="hero-demo-dot dot-red"></span>
-              <span class="hero-demo-dot dot-yellow"></span>
-              <span class="hero-demo-dot dot-green"></span>
-              <span class="hero-demo-window-title">lexcite.ch — Zitier-Werkbank</span>
+        <div class="hero-demo hero-demo-live" id="heroDemo" aria-label="Live Produktdemo">
+          <div class="lexcite-demo">
+            <div class="lx-chrome">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div class="lx-traffic"><span></span><span></span><span></span></div>
+                <div class="lx-url">lexcite.ch / werkbank</div>
+              </div>
+              <div class="lx-badge"><span class="lx-live-dot"></span>Live-Demo</div>
             </div>
-            <div class="hero-demo-chrome-right">BGer 9C_355/2023</div>
-          </div>
-          <div class="hero-demo-progress" aria-hidden="true">
-            <span class="hero-demo-progress-bar" id="heroDemoProgress"></span>
-          </div>
-          <div class="hero-demo-rail">
-            <div class="hero-demo-title">So funktioniert's</div>
-            <div class="hero-demo-steps" id="heroDemoStepList"></div>
-          </div>
-          <div class="hero-demo-controls" aria-label="Demo steuern">
-            <button class="hero-demo-icon-btn" id="heroDemoPlay" type="button" aria-label="Demo pausieren"></button>
-            <button class="hero-demo-icon-btn" id="heroDemoReset" type="button" aria-label="Demo neu starten">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                <path d="M2 7a5 5 0 1 0 1.5-3.5M2 2v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-            <div class="hero-demo-status" id="heroDemoStatus">Schritt 1 / 4 — PDF hochladen</div>
+            <div id="demo-root"></div>
           </div>
         </div>
         <div class="hero-actions">
@@ -761,6 +746,364 @@
 <script src="./checker-ui.js"></script>
 <script src="./tracker.js"></script>
 <script src="./hero-demo.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useLayoutEffect } = React;
+
+const DEMO_TIMINGS = {
+  enter: 900, idle: 500, scan: 800,
+  tokGap: 700, build: 220, buildHold: 1100,
+  fly: 1000, saved: 2000, reset: 600,
+};
+
+const DEMO_STEPS = ['PDF', 'Angaben', 'Zitat', 'Verzeichnis'];
+
+const DEMO_EXAMPLES = [
+  {
+    id: '9C_355', filename: '9C_355-2023.pdf',
+    tokens: [
+      { id: 'court', kind: 'court', label: 'Gericht', display: 'Bundesgericht' },
+      { id: 'num', kind: 'num', label: 'Geschäftsnr.', display: '9C_355/2023' },
+      { id: 'date', kind: 'date', label: 'Datum', display: '12. September 2023' },
+    ],
+    words: [
+      { t: 'BGer' }, { t: '9C_355/2023', kind: 'num' },
+      { t: 'vom' }, { t: '12. September 2023', kind: 'date' }, { t: ', E. 4.2.1.' },
+    ],
+    indexEntry: 'Bundesgericht, Urteil 9C_355/2023 vom 12. September 2023.',
+  },
+  {
+    id: 'BGE_149', filename: 'BGE_149_III_117.pdf',
+    tokens: [
+      { id: 'court', kind: 'court', label: 'Sammlung', display: 'BGE (Amtliche Sammlung)' },
+      { id: 'num', kind: 'num', label: 'Fundstelle', display: '149 III 117' },
+      { id: 'date', kind: 'date', label: 'Datum', display: '3. Februar 2023' },
+    ],
+    words: [
+      { t: 'BGE' }, { t: '149 III 117', kind: 'num' },
+      { t: 'vom' }, { t: '3. Februar 2023', kind: 'date' }, { t: ', E. 3.1.' },
+    ],
+    indexEntry: 'BGE 149 III 117 vom 3. Februar 2023.',
+  },
+  {
+    id: '4A_128', filename: 'BGer_4A_128-2024.pdf',
+    tokens: [
+      { id: 'court', kind: 'court', label: 'Gericht', display: 'Bundesgericht' },
+      { id: 'num', kind: 'num', label: 'Geschäftsnr.', display: '4A_128/2024' },
+      { id: 'date', kind: 'date', label: 'Datum', display: '28. Mai 2024' },
+    ],
+    words: [
+      { t: 'BGer' }, { t: '4A_128/2024', kind: 'num' },
+      { t: 'vom' }, { t: '28. Mai 2024', kind: 'date' }, { t: ', E. 2.3.' },
+    ],
+    indexEntry: 'Bundesgericht, Urteil 4A_128/2024 vom 28. Mai 2024.',
+  },
+];
+
+const PdfBody = ({ example }) => {
+  if (example.id === '9C_355') return (
+    <>
+      <h5>Urteil der II. sozialrechtlichen Abteilung</h5>
+      <div className="meta-line">
+        <span data-tok="num" className="tok">9C_355/2023</span> &nbsp;·&nbsp;
+        <span data-tok="date" className="tok">12. September 2023</span>
+      </div>
+      <p>Das <span data-tok="court" className="tok">Bundesgericht</span> hat auf die Beschwerde gegen den Entscheid des Versicherungsgerichts des Kantons Zürich vom 14. April 2023 in der Sitzung vom <span data-tok="date" className="tok">12. September 2023</span> entschieden.</p>
+      <p>Bei der Frage der Invalidenrente gemäss Art. 28 IVG erweist sich die Beurteilung der Arbeitsunfähigkeit als zentral (E. 4.2.1). Die Vorinstanz hat die medizinischen Akten umfassend gewürdigt.</p>
+    </>
+  );
+  if (example.id === 'BGE_149') return (
+    <>
+      <h5>Auszug aus dem Urteil der I. zivilrechtlichen Abteilung</h5>
+      <div className="meta-line">
+        <span data-tok="court" className="tok">BGE</span>&nbsp;
+        <span data-tok="num" className="tok">149 III 117</span> &nbsp;·&nbsp;
+        <span data-tok="date" className="tok">3. Februar 2023</span>
+      </div>
+      <p>In der Beschwerde in Zivilsachen betreffend Kaufvertrag und Gewährleistung hat das Bundesgericht am <span data-tok="date" className="tok">3. Februar 2023</span> entschieden und die Sache zur Neubeurteilung zurückgewiesen.</p>
+      <p>Ausgangspunkt bildet die Auslegung von Art. 197 OR. Die Vorinstanz hat die objektive Prüfung der Sachmängel mit ungenügender Sorgfalt vorgenommen (E. 3.1).</p>
+    </>
+  );
+  return (
+    <>
+      <h5>Urteil der I. zivilrechtlichen Abteilung</h5>
+      <div className="meta-line">
+        <span data-tok="num" className="tok">4A_128/2024</span> &nbsp;·&nbsp;
+        <span data-tok="date" className="tok">28. Mai 2024</span>
+      </div>
+      <p>Das <span data-tok="court" className="tok">Bundesgericht</span> hat in der Beschwerde in Zivilsachen gegen das Urteil des Handelsgerichts des Kantons Zürich in der Sitzung vom <span data-tok="date" className="tok">28. Mai 2024</span> entschieden.</p>
+      <p>Streitig ist die Tragweite der Haftung aus Art. 41 OR im Rahmen einer Geschäftsführung ohne Auftrag (E. 2.3). Die Vorinstanz hat den Sachverhalt zutreffend festgestellt.</p>
+    </>
+  );
+};
+
+function PdfBodyWithActive({ example, activeToks }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+    ref.current.querySelectorAll('.tok').forEach((node) => {
+      const id = node.getAttribute('data-tok');
+      const token = example.tokens.find((entry) => entry.id === id);
+      node.classList.remove('on-court', 'on-num', 'on-date');
+      if (activeToks.includes(id) && token) node.classList.add(`on-${token.kind}`);
+    });
+  }, [activeToks, example]);
+  return <div ref={ref}><PdfBody example={example} /></div>;
+}
+
+function Rail({ stepIdx }) {
+  return (
+    <div className="d-rail">
+      {DEMO_STEPS.map((name, i) => {
+        const cls = i < stepIdx ? 'done' : i === stepIdx ? 'active' : '';
+        return (
+          <div key={i} className={`node ${cls}`}>
+            <span className="dot"><span>{i + 1}</span></span>
+            <span className="name">{name}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function LiveDemo() {
+  const [phase, setPhase] = useState('enter');
+  const [loopN, setLoopN] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [activeToks, setActiveToks] = useState([]);
+  const [pinPositions, setPinPositions] = useState({});
+  const [wordsIn, setWordsIn] = useState(0);
+  const [flyFrom, setFlyFrom] = useState(null);
+  const [flyTo, setFlyTo] = useState(null);
+  const [flyOn, setFlyOn] = useState(false);
+  const [indexItems, setIndexItems] = useState([
+    { text: 'BGE 148 II 299 vom 17. November 2022.', isNew: false },
+    { text: 'BGer 2C_491/2022 vom 29. März 2023.', isNew: false },
+  ]);
+
+  const example = DEMO_EXAMPLES[loopN % DEMO_EXAMPLES.length];
+  const pdfRef = useRef(null);
+  const citeRef = useRef(null);
+  const indexRef = useRef(null);
+  const timers = useRef([]);
+  const clear = useCallback(() => { timers.current.forEach(clearTimeout); timers.current = []; }, []);
+  const schedule = useCallback((fn, ms) => { const id = setTimeout(fn, ms); timers.current.push(id); return id; }, []);
+
+  const measurePin = useCallback((tokId) => {
+    if (!pdfRef.current) return;
+    const nodes = pdfRef.current.querySelectorAll(`.tok[data-tok="${tokId}"]`);
+    if (!nodes.length) return;
+    const node = nodes[nodes.length - 1];
+    const pdfRect = pdfRef.current.getBoundingClientRect();
+    const rect = node.getBoundingClientRect();
+    const top = rect.top - pdfRect.top - 24;
+    const left = Math.max(6, Math.min(rect.left - pdfRect.left - 6, pdfRect.width - 140));
+    setPinPositions((prev) => ({ ...prev, [tokId]: { top, left } }));
+  }, []);
+
+  useEffect(() => {
+    if (paused) return;
+    clear();
+    const next = {
+      enter: () => schedule(() => setPhase('idle'), DEMO_TIMINGS.enter),
+      idle: () => schedule(() => setPhase('scan'), DEMO_TIMINGS.idle),
+      scan: () => schedule(() => setPhase('tok0'), DEMO_TIMINGS.scan),
+      tok0: () => {
+        const id = example.tokens[0].id;
+        setActiveToks([id]);
+        schedule(() => measurePin(id), 30);
+        schedule(() => setPhase('tok1'), DEMO_TIMINGS.tokGap);
+      },
+      tok1: () => {
+        const id = example.tokens[1].id;
+        setActiveToks((prev) => [...prev, id]);
+        schedule(() => measurePin(id), 30);
+        schedule(() => setPhase('tok2'), DEMO_TIMINGS.tokGap);
+      },
+      tok2: () => {
+        const id = example.tokens[2].id;
+        setActiveToks((prev) => [...prev, id]);
+        schedule(() => measurePin(id), 30);
+        schedule(() => setPhase('build'), DEMO_TIMINGS.tokGap);
+      },
+      build: () => {
+        example.words.forEach((_, i) => schedule(() => setWordsIn(i + 1), i * DEMO_TIMINGS.build));
+        schedule(() => setPhase('hold'), example.words.length * DEMO_TIMINGS.build + 200);
+      },
+      hold: () => schedule(() => setPhase('fly'), DEMO_TIMINGS.buildHold),
+      fly: () => {
+        if (!citeRef.current || !indexRef.current || !pdfRef.current) {
+          schedule(() => setPhase('saved'), 100);
+          return;
+        }
+        const pRect = pdfRef.current.parentElement.getBoundingClientRect();
+        const cRect = citeRef.current.getBoundingClientRect();
+        const iRect = indexRef.current.getBoundingClientRect();
+        setFlyFrom({ top: cRect.top - pRect.top + 8, left: cRect.left - pRect.left + 16, width: Math.min(cRect.width - 32, 340) });
+        setFlyTo({ top: iRect.top - pRect.top + 28, left: iRect.left - pRect.left + 16 });
+        schedule(() => setFlyOn(true), 40);
+        schedule(() => {
+          setFlyOn(false);
+          setFlyFrom(null);
+          setFlyTo(null);
+          setIndexItems((prev) => [...prev.map((item) => ({ ...item, isNew: false })), { text: example.indexEntry, isNew: true }]);
+          setPhase('saved');
+        }, DEMO_TIMINGS.fly);
+      },
+      saved: () => schedule(() => setPhase('reset'), DEMO_TIMINGS.saved),
+      reset: () => schedule(() => {
+        setActiveToks([]);
+        setPinPositions({});
+        setWordsIn(0);
+        setIndexItems((prev) => prev.slice(0, 2).map((item) => ({ ...item, isNew: false })));
+        setLoopN((n) => n + 1);
+        setPhase('enter');
+      }, DEMO_TIMINGS.reset),
+    };
+    next[phase]?.();
+    return clear;
+  }, [phase, paused, clear, schedule, example, measurePin]);
+
+  useEffect(() => {
+    const handler = () => activeToks.forEach((id) => measurePin(id));
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [activeToks, measurePin]);
+
+  let stepIdx = 0;
+  if (phase === 'enter' || phase === 'idle') stepIdx = 0;
+  else if (phase === 'scan' || phase.startsWith('tok')) stepIdx = 1;
+  else if (phase === 'build' || phase === 'hold') stepIdx = 2;
+  else stepIdx = 3;
+
+  const inScan = phase === 'scan' || phase.startsWith('tok');
+  const citeFocus = phase === 'hold' || phase === 'fly';
+  const citeVisible = ['build', 'hold', 'fly', 'saved', 'reset'].includes(phase);
+
+  const reset = () => {
+    clear();
+    setActiveToks([]);
+    setPinPositions({});
+    setWordsIn(0);
+    setIndexItems((prev) => prev.slice(0, 2).map((item) => ({ ...item, isNew: false })));
+    setFlyFrom(null);
+    setFlyTo(null);
+    setFlyOn(false);
+    setPhase('enter');
+  };
+
+  return (
+    <div className="d-stage" key={example.id}>
+      <div className="d-left">
+        <Rail stepIdx={stepIdx} />
+        <div ref={pdfRef} className={`d-pdf ${phase === 'enter' ? 'entering' : 'entered'}`}>
+          <div className="d-pdf-head">
+            <span>{example.filename}</span>
+            <span>Seite 1 / 7</span>
+          </div>
+          <PdfBodyWithActive example={example} activeToks={activeToks} />
+          <div className={`d-scan-line ${inScan ? 'run' : ''}`} />
+          {example.tokens.map((tok) => {
+            const pos = pinPositions[tok.id];
+            if (!pos) return null;
+            return (
+              <div key={tok.id} className={`d-pin bg-${tok.kind} ${activeToks.includes(tok.id) ? 'show' : ''}`} style={{ top: pos.top, left: pos.left }}>
+                {tok.label}
+              </div>
+            );
+          })}
+        </div>
+        <div className="d-caption">
+          {phase === 'enter' && <><span className="ping" /> Datei wird geladen …</>}
+          {phase === 'idle' && <><span className="ping" /> Dokument bereit</>}
+          {inScan && <><span className="ping" /> Angaben werden im Dokument markiert</>}
+          {(phase === 'build' || phase === 'hold') && <>Zitat wird aus den Angaben aufgebaut</>}
+          {phase === 'fly' && <>→ Übernahme ins Verzeichnis</>}
+          {phase === 'saved' && <>✓ Im Verzeichnis übernommen</>}
+          {phase === 'reset' && <>Nächstes Beispiel …</>}
+        </div>
+      </div>
+
+      <div className="d-right">
+        <div className="d-tokens">
+          {activeToks.length === 0 && <span className="empty">Angaben erscheinen hier, sobald sie im PDF erkannt sind…</span>}
+          {example.tokens.map((tok) => (
+            <div key={tok.id} className={`d-tok-card kind-${tok.kind} ${activeToks.includes(tok.id) ? 'in' : ''} ${phase === 'build' || phase === 'hold' ? 'highlight' : ''}`}>
+              <span className="k">{tok.label}</span>
+              <span className="v">{tok.display}</span>
+            </div>
+          ))}
+        </div>
+
+        <div ref={citeRef} className={`d-cite ${citeFocus ? 'focus' : ''}`}>
+          <div className="d-cite-label">
+            <span>Vollzitat · ZHAW SML</span>
+            {citeVisible && <span className="copy"><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" stroke="currentColor" strokeWidth="2" /></svg>kopieren</span>}
+          </div>
+          <div className="d-cite-text">
+            {citeVisible ? (
+              example.words.map((w, i) => (
+                <React.Fragment key={i}>
+                  <span className={`word ${i < wordsIn ? 'in' : ''} ${w.kind ? `kind-${w.kind}` : ''}`}>{w.t}</span>
+                  {i < example.words.length - 1 && !example.words[i + 1].t.startsWith(',') && <span> </span>}
+                </React.Fragment>
+              ))
+            ) : (
+              <span className="placeholder">Wird zusammengesetzt, sobald alle Angaben erkannt sind …</span>
+            )}
+          </div>
+        </div>
+
+        <div ref={indexRef} className="d-index">
+          <div className="d-index-head">
+            <span>Entscheidverzeichnis</span>
+            <span className="d-index-count">{indexItems.length} Einträge</span>
+          </div>
+          <ul>
+            {indexItems.map((item, i) => (
+              <li key={`${i}-${item.text}`} className={item.isNew ? 'new' : ''}>{item.text}</li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="d-controls">
+          <button onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Abspielen' : 'Pause'}>
+            {paused
+              ? <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+              : <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" /><rect x="14" y="5" width="4" height="14" /></svg>}
+          </button>
+          <button onClick={reset} aria-label="Neu starten">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><path d="M3 3v5h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+          </button>
+          <span>{paused ? 'Pausiert' : 'Auto-Loop'}</span>
+          <span className="spacer" />
+          <span className="dots">
+            {DEMO_EXAMPLES.map((_, i) => <i key={i} className={i === loopN % DEMO_EXAMPLES.length ? 'on' : ''} />)}
+          </span>
+        </div>
+      </div>
+
+      {flyFrom && (
+        <div className="d-fly" style={{
+          top: flyOn && flyTo ? flyTo.top : flyFrom.top,
+          left: flyOn && flyTo ? flyTo.left : flyFrom.left,
+          width: flyFrom.width,
+          opacity: flyOn ? 0.4 : 1,
+          transform: flyOn ? 'scale(0.7)' : 'scale(1)',
+        }}>
+          {example.indexEntry}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const demoRoot = document.getElementById('demo-root');
+if (demoRoot) ReactDOM.createRoot(demoRoot).render(<LiveDemo />);
+</script>
 <script>
 // ══════════════════════════════════════════════════════════════
 //  KI PDF-Fallback
