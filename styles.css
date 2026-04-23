@@ -4863,3 +4863,224 @@ textarea:focus {
     text-align: left;
   }
 }
+
+/* Final alignment and dark-mode coherence pass. */
+.header-main {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  margin: 0 auto 34px;
+}
+
+.header-badge {
+  max-width: 360px;
+  justify-content: center;
+  text-align: center;
+  margin: 0 auto;
+}
+
+header h1 {
+  font-size: clamp(4.25rem, 7.6vw, 7.4rem);
+  line-height: 0.86;
+  margin: 0;
+}
+
+header p {
+  max-width: 620px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.hero-panel {
+  margin-top: 22px;
+}
+
+select {
+  background-repeat: no-repeat !important;
+  background-position: right 18px center !important;
+  background-size: 16px 16px !important;
+}
+
+body.dark {
+  background:
+    radial-gradient(ellipse 880px 520px at 82% -12%, rgba(205,163,160,0.10), transparent 64%),
+    radial-gradient(ellipse 720px 460px at -8% 100%, rgba(47,93,58,0.08), transparent 62%),
+    #14110F !important;
+}
+
+body.dark header {
+  background:
+    radial-gradient(ellipse 640px 380px at 84% 0%, rgba(205,163,160,0.08), transparent 62%),
+    linear-gradient(180deg, rgba(23,19,16,0.98), rgba(20,17,15,0.94)) !important;
+  border-bottom-color: rgba(83,72,61,0.76) !important;
+}
+
+body.dark .header-badge,
+body.dark .page-nav,
+body.dark .card,
+body.dark .quickstart-card,
+body.dark .hero-demo,
+body.dark .workspace-panel,
+body.dark .workspace-panel-secondary,
+body.dark .type-selector,
+body.dark .pdf-section,
+body.dark .drop-area,
+body.dark .output-block,
+body.dark .checker-panel,
+body.dark .checker-reference-panel,
+body.dark .checker-reference-panel-internal,
+body.dark .bulk-checker-panel,
+body.dark .advanced-tools,
+body.dark .account-panel,
+body.dark .quellen-card,
+body.dark .quellen-card-inner,
+body.dark .project-panel,
+body.dark .consistency-panel,
+body.dark .backup-panel,
+body.dark .utility-details,
+body.dark .modal-box {
+  background: linear-gradient(180deg, rgba(30,26,22,0.98), rgba(19,16,14,0.99)) !important;
+  border-color: rgba(88,76,64,0.82) !important;
+  color: #F4EDE2 !important;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.34) !important;
+}
+
+body.dark .hero-demo-head,
+body.dark .workspace-panel-head,
+body.dark .checker-panel-header,
+body.dark .advanced-tools-summary,
+body.dark .utility-summary,
+body.dark .backup-panel-head,
+body.dark .consistency-panel-head,
+body.dark .bulk-checker-head {
+  background: linear-gradient(180deg, rgba(37,32,27,0.96), rgba(24,20,17,0.92)) !important;
+  border-color: rgba(88,76,64,0.78) !important;
+}
+
+body.dark .hero-demo-step,
+body.dark .hero-demo-caption,
+body.dark .hero-demo-canvas,
+body.dark .hero-demo-file,
+body.dark .hero-demo-field,
+body.dark .hero-demo-output-text,
+body.dark .workspace-note,
+body.dark .workspace-guide-step,
+body.dark .empty-state,
+body.dark .empty-state-compact,
+body.dark .checker-ref-chip,
+body.dark .checker-ref-btn,
+body.dark .support-chip,
+body.dark .tracker-reset,
+body.dark .sources-tab,
+body.dark .sources-search-input,
+body.dark input[type="text"],
+body.dark select,
+body.dark textarea,
+body.dark .ai-parse-textarea {
+  background: rgba(20,17,15,0.92) !important;
+  border-color: rgba(88,76,64,0.84) !important;
+  color: #F4EDE2 !important;
+}
+
+body.dark .hero-demo-caption strong,
+body.dark .hero-demo-file strong,
+body.dark .hero-demo-field strong,
+body.dark .hero-demo-output-text,
+body.dark .workspace-panel-title,
+body.dark .output-block-label,
+body.dark .quickstart-card strong,
+body.dark .checker-panel-title,
+body.dark .type-selector label,
+body.dark .page-section-title,
+body.dark .modal-box h2,
+body.dark .modal-box h3 {
+  color: #F4EDE2 !important;
+}
+
+body.dark header p,
+body.dark .hero-copy,
+body.dark .hero-demo-caption span,
+body.dark .hero-demo-intro,
+body.dark .hero-demo-status,
+body.dark .hero-demo-scene-note,
+body.dark .hero-demo-file span,
+body.dark .hero-demo-mini-note,
+body.dark .quickstart-card span,
+body.dark .workspace-panel-subtitle,
+body.dark .drop-text,
+body.dark .page-section-desc,
+body.dark .advanced-tools-copy,
+body.dark .site-footer,
+body.dark .site-footer a,
+body.dark .modal-box p,
+body.dark .modal-box li {
+  color: #C9BDAE !important;
+}
+
+body.dark .hero-demo-step.active,
+body.dark .page-nav-tab.active {
+  background: rgba(138,43,43,0.34) !important;
+  border-color: rgba(205,163,160,0.34) !important;
+  color: #FFF8ED !important;
+}
+
+body.dark .hero-demo-progress,
+body.dark .tracker-progress-bar {
+  background: rgba(88,76,64,0.72) !important;
+}
+
+body.dark .hero-demo-progress-bar,
+body.dark .tracker-progress-fill {
+  background: linear-gradient(90deg, #CDA3A0, #8A2B2B) !important;
+}
+
+body.dark .hero-cta-secondary,
+body.dark .btn-export,
+body.dark .btn-copy,
+body.dark .btn-add,
+body.dark .checker-ref-btn,
+body.dark .tracker-reset {
+  background: rgba(20,17,15,0.9) !important;
+  border-color: rgba(88,76,64,0.86) !important;
+  color: #F4EDE2 !important;
+}
+
+body.dark .hero-cta-primary,
+body.dark .btn-check,
+body.dark .btn-generate,
+body.dark .btn-save-citation,
+body.dark .btn-file-select,
+body.dark .ai-parse-btn {
+  background: #F4EDE2 !important;
+  border-color: #F4EDE2 !important;
+  color: #14110F !important;
+}
+
+body.dark .drop-area {
+  border-style: dashed;
+}
+
+body.dark select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23CDA3A0' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 18px center !important;
+  background-size: 16px 16px !important;
+}
+
+@media (max-width: 980px) {
+  header h1 {
+    font-size: clamp(3.5rem, 18vw, 5.75rem);
+  }
+
+  .header-main {
+    align-items: center;
+    text-align: center;
+  }
+
+  header p {
+    text-align: center;
+  }
+}
