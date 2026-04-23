@@ -1,4 +1,4 @@
-const LEXCITE_PRICING_SURVEY_VERSION = 'v10-entry-questions-study-program';
+const LEXCITE_PRICING_SURVEY_VERSION = 'v11-entry-popup-study-program';
 
 const LEXCITE_PRICING_SURVEY_DEFAULT = {
   version: LEXCITE_PRICING_SURVEY_VERSION,
@@ -229,7 +229,7 @@ const LexCitePricingSurvey = {
     this.save();
   },
 
-  closeModal() {
+  closeModal(userInitiated = true) {
     const modal = document.getElementById('pricingSurveyModal');
     if (modal) modal.classList.remove('open');
     document.body.classList.remove('pricing-survey-modal-open');
@@ -239,7 +239,7 @@ const LexCitePricingSurvey = {
       this.save();
       return;
     }
-    if (!this.state.choice && !this.state.dismissed) {
+    if (userInitiated && !this.state.choice && !this.state.dismissed) {
       this.state.modalClosed = true;
       this.save();
     }
@@ -268,7 +268,7 @@ const LexCitePricingSurvey = {
     if (!card || !intro || !actions || !result || !modal || !modalCopy || !modalPriceStep || !modalStudyStep) return;
 
     if (this.shouldShow()) {
-      card.style.display = '';
+      card.style.display = 'none';
       intro.textContent = 'Kurze Einschätzung: Welcher Semesterpass wäre für dich für LexCite noch realistisch?';
       actions.style.display = 'grid';
       result.style.display = 'none';
@@ -296,12 +296,12 @@ const LexCitePricingSurvey = {
       actions.style.display = 'none';
       result.style.display = 'none';
       result.textContent = '';
-      this.closeModal();
+      this.closeModal(false);
       return;
     }
 
     card.style.display = 'none';
-    this.closeModal();
+    this.closeModal(false);
   },
 
   init() {
