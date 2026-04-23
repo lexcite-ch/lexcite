@@ -1,75 +1,110 @@
 (() => {
+  const STEPS = [
+    { label: 'PDF hochladen', hint: 'Datei wählen oder einfügen' },
+    { label: 'Angaben prüfen', hint: 'Quellentyp, Datum und Nummer kontrollieren' },
+    { label: 'Vollzitat kopieren', hint: 'Fussnote oder Vollzitat übernehmen' },
+    { label: 'Im Verzeichnis speichern', hint: 'Ins passende Quellenverzeichnis sichern' },
+  ];
+
+  const STEP_DURATION = 3000;
+
   function initHeroDemo() {
     const demo = document.getElementById('heroDemo');
-    if (!demo) return;
-
-    const steps = Array.from(demo.querySelectorAll('.hero-demo-step'));
-    const caption = document.getElementById('heroDemoCaption');
+    const listEl = document.getElementById('heroDemoStepList');
     const progressBar = document.getElementById('heroDemoProgress');
-    if (!steps.length) return;
+    const playBtn = document.getElementById('heroDemoPlay');
+    const resetBtn = document.getElementById('heroDemoReset');
+    const statusEl = document.getElementById('heroDemoStatus');
+    if (!demo || !listEl || !progressBar || !playBtn || !resetBtn || !statusEl) return;
 
-    const captions = [
-      {
-        title: 'PDF hochladen',
-        body: 'Lade den Entscheid hoch. LexCite liest die ersten wichtigen Angaben direkt aus dem PDF.'
-      },
-      {
-        title: 'Kurz prüfen',
-        body: 'Prüfe kurz Quellentyp, Geschäftsnummer und Datum. Meist dauert das nur ein paar Sekunden.'
-      },
-      {
-        title: 'Vollzitat kopieren',
-        body: 'Das Vollzitat ist fertig. Du musst die Struktur nicht mehr selbst aus dem Guide zusammensetzen.'
-      },
-      {
-        title: 'Speichern',
-        body: 'Speichere den Fall ab, damit Vollzitat, Kurzangabe und Verzeichniseintrag zusammenbleiben.'
-      }
-    ];
+    let current = 0;
+    let playing = true;
+    let startTime = null;
+    let raf = null;
 
-    let activeIndex = 0;
-    let intervalId = null;
+    listEl.innerHTML = STEPS.map((step, index) => `
+      <button class="hero-demo-step" id="heroDemoStep-${index}" type="button" data-step-index="${index}">
+        <span class="hero-demo-step-num" id="heroDemoStepNum-${index}">${index + 1}</span>
+        <span class="hero-demo-step-copy">
+          <span class="hero-demo-step-label">${step.label}</span>
+          <span class="hero-demo-step-hint">${step.hint}</span>
+        </span>
+      </button>
+    `).join('');
 
-    function renderStep(index) {
-      activeIndex = index % steps.length;
-      demo.dataset.step = String(activeIndex);
-      steps.forEach((step, stepIndex) => {
-        step.classList.toggle('active', stepIndex === activeIndex);
-      });
-      if (caption && captions[activeIndex]) {
-        caption.innerHTML = `<strong>${captions[activeIndex].title}</strong><span>${captions[activeIndex].body}</span>`;
-      }
-      if (progressBar) {
-        progressBar.style.width = `${((activeIndex + 1) / steps.length) * 100}%`;
-      }
+    const stepRows = Array.from(listEl.querySelectorAll('.hero-demo-step'));
+
+    function renderPlayIcon() {
+      playBtn.setAttribute('aria-label', playing ? 'Demo pausieren' : 'Demo abspielen');
+      playBtn.innerHTML = playing
+        ? '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="1" width="3" height="10" fill="currentColor"/><rect x="7" y="1" width="3" height="10" fill="currentColor"/></svg>'
+        : '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg>';
     }
 
-    function startLoop() {
-      if (intervalId) clearInterval(intervalId);
-      intervalId = window.setInterval(() => {
-        renderStep((activeIndex + 1) % steps.length);
-      }, 2200);
+    function renderStep(index, progress = 0) {
+      current = index;
+      demo.dataset.step = String(index);
+
+      stepRows.forEach((row, rowIndex) => {
+        const num = document.getElementById(`heroDemoStepNum-${rowIndex}`);
+        row.classList.toggle('active', rowIndex === index);
+        row.classList.toggle('done', rowIndex < index);
+        if (!num) return;
+        num.classList.toggle('active', rowIndex === index);
+        num.classList.toggle('done', rowIndex < index);
+        num.classList.toggle('pending', rowIndex > index);
+        num.textContent = rowIndex < index ? '✓' : String(rowIndex + 1);
+      });
+
+      const totalProgress = (index + progress) / STEPS.length;
+      progressBar.style.width = `${Math.min(100, totalProgress * 100)}%`;
+      statusEl.textContent = `Schritt ${index + 1} / ${STEPS.length} — ${STEPS[index].label}`;
     }
 
-    steps.forEach((step, index) => {
-      step.addEventListener('mouseenter', () => {
-        renderStep(index);
+    function goTo(index) {
+      current = index;
+      startTime = performance.now();
+      renderStep(current, 0);
+    }
+
+    function tick(timestamp) {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(1, elapsed / STEP_DURATION);
+      renderStep(current, progress);
+      if (progress >= 1) {
+        current = (current + 1) % STEPS.length;
+        startTime = null;
+      }
+      raf = requestAnimationFrame(tick);
+    }
+
+    function setPlaying(value) {
+      playing = value;
+      if (raf) cancelAnimationFrame(raf);
+      if (playing) {
+        startTime = null;
+        raf = requestAnimationFrame(tick);
+      }
+      renderPlayIcon();
+    }
+
+    stepRows.forEach((row) => {
+      row.addEventListener('click', () => {
+        const index = Number(row.dataset.stepIndex || 0);
+        goTo(index);
       });
-      step.addEventListener('focus', () => {
-        renderStep(index);
-      });
     });
 
-    demo.addEventListener('mouseenter', () => {
-      if (intervalId) clearInterval(intervalId);
+    playBtn.addEventListener('click', () => setPlaying(!playing));
+    resetBtn.addEventListener('click', () => {
+      current = 0;
+      startTime = performance.now();
+      renderStep(0, 0);
     });
 
-    demo.addEventListener('mouseleave', () => {
-      startLoop();
-    });
-
-    renderStep(0);
-    startLoop();
+    renderStep(0, 0);
+    setPlaying(true);
   }
 
   if (document.readyState === 'loading') {

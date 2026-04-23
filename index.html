@@ -27,71 +27,31 @@
         <div class="hero-copy">
           Bei Entscheiden frisst nicht die Fussnote Zeit, sondern das vollständige Werkzitat. LexCite bereitet Geschäftsnummer, Datum und Verzeichniseintrag direkt vor.
         </div>
-        <div class="hero-demo" id="heroDemo" data-step="0" aria-label="Kurze Produktvorschau">
-          <div class="hero-demo-head">
-            <div class="hero-demo-title">So funktioniert's</div>
-            <div class="hero-demo-status">vom PDF zum Verzeichniseintrag</div>
-          </div>
-          <div class="hero-demo-intro">Ein klarer Ablauf: hochladen, kurz prüfen, Vollzitat übernehmen, speichern.</div>
-          <div class="hero-demo-steps">
-            <span class="hero-demo-step active">1. PDF hochladen</span>
-            <span class="hero-demo-step">2. Angaben prüfen</span>
-            <span class="hero-demo-step">3. Vollzitat kopieren</span>
-            <span class="hero-demo-step">4. Im Verzeichnis speichern</span>
-          </div>
-          <div class="hero-demo-caption" id="heroDemoCaption">
-            <strong>PDF hochladen</strong>
-            <span>Zieh einen BGer- oder BGE-Entscheid hinein. LexCite erkennt Geschäftsnummer und Datum direkt aus dem Dokument.</span>
+        <div class="hero-demo hero-demo-workbench" id="heroDemo" data-step="0" aria-label="Kurze Produktvorschau">
+          <div class="hero-demo-chrome">
+            <div class="hero-demo-chrome-left">
+              <span class="hero-demo-dot dot-red"></span>
+              <span class="hero-demo-dot dot-yellow"></span>
+              <span class="hero-demo-dot dot-green"></span>
+              <span class="hero-demo-window-title">lexcite.ch — Zitier-Werkbank</span>
+            </div>
+            <div class="hero-demo-chrome-right">BGer 9C_355/2023</div>
           </div>
           <div class="hero-demo-progress" aria-hidden="true">
             <span class="hero-demo-progress-bar" id="heroDemoProgress"></span>
           </div>
-          <div class="hero-demo-canvas">
-            <div class="hero-demo-scene hero-demo-scene-upload">
-              <div class="hero-demo-scene-meta">
-                <span class="hero-demo-scene-pill hero-demo-scene-pill-ok">BGer erkannt</span>
-                <span class="hero-demo-scene-note">lokal verarbeitet</span>
-              </div>
-              <div class="hero-demo-file">
-                <span class="hero-demo-file-icon">📄</span>
-                <div>
-                  <strong>BGer 9C_355_2023.pdf</strong>
-                  <span>LexCite liest Datum und Geschäftsnummer direkt aus</span>
-                </div>
-              </div>
-            </div>
-            <div class="hero-demo-scene hero-demo-scene-fields">
-              <div class="hero-demo-scene-meta">
-                <span class="hero-demo-scene-pill">Autofill aktiv</span>
-                <span class="hero-demo-scene-note">1 Feld kurz prüfen</span>
-              </div>
-              <div class="hero-demo-field-group">
-                <div class="hero-demo-field">
-                  <label>Quellentyp</label>
-                  <strong>BGer (nicht amtlich publiziert)</strong>
-                </div>
-                <div class="hero-demo-field">
-                  <label>Geschäftsnummer</label>
-                  <strong>9C_355/2023</strong>
-                </div>
-                <div class="hero-demo-field">
-                  <label>Datum</label>
-                  <strong>07.09.2023</strong>
-                </div>
-              </div>
-            </div>
-            <div class="hero-demo-scene hero-demo-scene-output">
-              <div class="hero-demo-scene-meta">
-                <span class="hero-demo-scene-pill">Sauberes Vollzitat</span>
-                <span class="hero-demo-scene-note">direkt kopierbar</span>
-              </div>
-              <div class="hero-demo-output-label">Vollzitat</div>
-              <div class="hero-demo-output-text">BGer 9C_355/2023 vom 07.09.2023 E. 5.2.</div>
-            </div>
-            <div class="hero-demo-scene hero-demo-scene-save">
-              <div class="hero-demo-success">Im Judikaturverzeichnis gespeichert</div>
-              <div class="hero-demo-mini-note">Danach bleibt alles zusammen: Vollzitat, Kurzangabe und Verzeichniseintrag.</div>
-            </div>
+          <div class="hero-demo-rail">
+            <div class="hero-demo-title">So funktioniert's</div>
+            <div class="hero-demo-steps" id="heroDemoStepList"></div>
+          </div>
+          <div class="hero-demo-controls" aria-label="Demo steuern">
+            <button class="hero-demo-icon-btn" id="heroDemoPlay" type="button" aria-label="Demo pausieren"></button>
+            <button class="hero-demo-icon-btn" id="heroDemoReset" type="button" aria-label="Demo neu starten">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M2 7a5 5 0 1 0 1.5-3.5M2 2v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="hero-demo-status" id="heroDemoStatus">Schritt 1 / 4 — PDF hochladen</div>
           </div>
         </div>
         <div class="hero-actions">
