@@ -8,8 +8,9 @@
   <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Caveat:wght@500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./lx-redesign.css">
 </head>
 <body>
 <div class="container">
@@ -355,6 +356,9 @@
      PAGE: QUELLEN
 ════════════════════════════════════════════════════════════════ -->
 <div class="page-section" id="page-quellen">
+  <div id="lxr-quellen-root"></div>
+  <!-- Bestehendes HTML versteckt, damit workspace.js weiter funktioniert -->
+  <div id="lxr-legacy-quellen" style="display:none" aria-hidden="true">
   <div class="quellen-card">
     <div class="quellen-card-inner" style="padding-bottom:0">
       <div class="project-panel">
@@ -517,12 +521,16 @@
       </div>
     </div><!-- /quellen-card-inner -->
   </div><!-- /quellen-card -->
+  </div>
 </div><!-- /page-quellen -->
 
 <!-- ══════════════════════════════════════════════════════════════
      PAGE: TRACKER
 ════════════════════════════════════════════════════════════════ -->
 <div class="page-section" id="page-tracker">
+  <div id="lxr-tracker-root"></div>
+  <!-- Bestehendes HTML versteckt, damit tracker.js weiter funktioniert -->
+  <div id="lxr-legacy-tracker" style="display:none" aria-hidden="true">
   <div class="tracker-page-card" id="trackerWrap">
     <div class="tracker-header-row">
       <div class="tracker-title">📊 Quellentracker</div>
@@ -549,6 +557,7 @@
     <div class="tracker-empty visible" id="trackerEmpty">Noch kein Zitat generiert — fange mit dem ersten an! 🚀</div>
 
   </div><!-- /tracker-page-card -->
+  </div>
 </div><!-- /page-tracker -->
 
 </div><!-- /container -->
@@ -1172,6 +1181,1063 @@ async function applyAIFields(data) {
     document.getElementById('autofillLegend')?.classList.add('visible');
   }
 }
+</script>
+<script type="text/babel">
+// Inline fallback for local file opening; source mirrored from ./lx-redesign.jsx
+(function() {
+  const DATA_EVENT = 'lxr:data-changed';
+
+  const origSyncWorkspaceGlobals = window.syncWorkspaceGlobals;
+  window.syncWorkspaceGlobals = function() {
+    if (origSyncWorkspaceGlobals) origSyncWorkspaceGlobals();
+    window.dispatchEvent(new CustomEvent(DATA_EVENT));
+  };
+
+  const KIND_LABELS = {
+    bge: 'BGE', bger: 'BGer', bvge: 'BGer',
+    monographie: 'Monographie', dissertation: 'Dissertation',
+    zeitschrift: 'Zeitschrift', kommentar: 'Kommentar',
+    kantonal: 'Kantonal', sammelband: 'Sammelband',
+    gesetz: 'Gesetz/Erlass', internet: 'Internet', materialien: 'Materialien',
+  };
+
+  const KIND_COLORS = {
+    bge: 'var(--c-orange)', bger: 'var(--c-purple)', bvge: 'var(--c-purple)',
+    monographie: 'var(--c-blue)', dissertation: 'var(--c-rose)',
+    zeitschrift: 'var(--c-green)', kommentar: 'var(--c-olive)',
+    kantonal: 'var(--c-red)', sammelband: 'var(--c-teal)',
+    gesetz: 'var(--c-slate)', internet: 'var(--c-pink)', materialien: 'var(--c-olive)',
+  };
+
+  const CATEGORY_TARGETS = {
+    'BGE': 3, 'BGer': 3, 'Monographie': 2, 'Dissertation': 1, 'Zeitschrift': 2,
+    'Kommentar': 2, 'Kantonal': 1, 'Sammelband': 1, 'Gesetz/Erlass': 2, 'Internet': 1,
+  };
+
+  const CATEGORY_ORDER = Object.keys(CATEGORY_TARGETS);
+
+  const CATEGORY_COLORS = {
+    'BGE': 'var(--c-orange)', 'BGer': 'var(--c-purple)', 'Monographie': 'var(--c-blue)',
+    'Dissertation': 'var(--c-rose)', 'Zeitschrift': 'var(--c-green)', 'Kommentar': 'var(--c-olive)',
+    'Kantonal': 'var(--c-red)', 'Sammelband': 'var(--c-teal)', 'Gesetz/Erlass': 'var(--c-slate)',
+    'Internet': 'var(--c-pink)',
+  };
+
+  function extractAuthor(fullText, type) {
+    const text = String(fullText || '');
+    const litTypes = ['monographie', 'dissertation', 'zeitschrift', 'kommentar', 'sammelband'];
+    if (litTypes.includes(type)) {
+      const m = text.match(/^([A-ZÄÖÜ][A-ZÄÖÜ\s]+?)(?:\s[A-Z][a-zäöü]|\s+u\.a\.|,)/);
+      if (m) return m[1].trim();
+    }
+    return '—';
+  }
+
+  function extractYear(text) {
+    const matches = String(text || '').match(/\b(19|20)\d{2}\b/g);
+    return matches ? matches[matches.length - 1] : '';
+  }
+
+  function extractTitle(fullText, type, stichwort) {
+    const text = String(fullText || '');
+    if (stichwort) return stichwort;
+    return text.length > 65 ? text.slice(0, 62) + '…' : text;
+  }
+
+  function parseIsoDate(dateString) {
+    if (!dateString) return null;
+    const d = new Date(dateString + 'T00:00:00');
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function daysLeft(dueDate) {
+    const d = parseIsoDate(dueDate);
+    if (!d) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.ceil((d.getTime() - today.getTime()) / 86400000);
+  }
+
+  function formatDue(dueDate) {
+    const d = parseIsoDate(dueDate);
+    if (!dueDate) return 'Kein Abgabedatum';
+    if (!d) return dueDate;
+    return d.toLocaleDateString('de-CH');
+  }
+
+  function getGoal() {
+    if (window.LexCiteStorage && window.LEXCITE_STORAGE_KEYS) {
+      return parseInt(window.LexCiteStorage.get(window.LEXCITE_STORAGE_KEYS.trackerGoal, '30'), 10) || 30;
+    }
+    return parseInt(localStorage.getItem('lexcite_goal') || '30', 10) || 30;
+  }
+
+  function bridgeSources(savedCitations) {
+    return (savedCitations || []).map((c) => {
+      const fullText = String(c?.fullText || '');
+      return {
+        id: String(c?.id ?? ''),
+        kind: KIND_LABELS[c?.type] || c?.typeLabel || c?.type || 'Quelle',
+        color: KIND_COLORS[c?.type] || 'var(--c-slate)',
+        title: extractTitle(fullText, c?.type, c?.stichwort),
+        cite: fullText,
+        author: extractAuthor(fullText, c?.type),
+        year: extractYear(fullText) || '',
+        used: 0,
+        pages: '',
+        _raw: c,
+      };
+    });
+  }
+
+  function bridgeProject(meta, goal) {
+    return {
+      name: meta?.title || 'Mein Projekt',
+      module: meta?.course || '',
+      due: formatDue(meta?.dueDate),
+      dueRaw: meta?.dueDate || '',
+      notes: meta?.notes || '',
+      targetSources: goal,
+    };
+  }
+
+  function setLegacyValue(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = value;
+  }
+
+  function syncProjectDraftToLegacy(draft) {
+    setLegacyValue('projectTitle', draft.name || '');
+    setLegacyValue('projectCourse', draft.module || '');
+    setLegacyValue('projectDueDate', draft.dueRaw || '');
+    setLegacyValue('projectNotes', draft.notes || '');
+    if (window.updateProjectStatus) window.updateProjectStatus(false);
+  }
+
+  function changeGoal(delta, goal) {
+    const newGoal = Math.max(1, goal + delta);
+    if (window.LexCiteStorage && window.LEXCITE_STORAGE_KEYS) {
+      window.LexCiteStorage.set(window.LEXCITE_STORAGE_KEYS.trackerGoal, String(newGoal));
+    } else {
+      localStorage.setItem('lexcite_goal', String(newGoal));
+    }
+    const goalInput = document.getElementById('goalInput');
+    if (goalInput) goalInput.value = String(newGoal);
+    if (window.updateTrackerDisplay) window.updateTrackerDisplay();
+    window.dispatchEvent(new CustomEvent(DATA_EVENT));
+  }
+
+  function parseCitationDate(dateString) {
+    if (!dateString) return null;
+    const parts = String(dateString).split('.');
+    if (parts.length !== 3) return null;
+    const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function runAuditAndRead(setAuditHtml) {
+    if (!window.runConsistencyAudit) return;
+    window.runConsistencyAudit();
+    const result = document.getElementById('consistencyResult');
+    const html = result?.innerHTML || '';
+    setAuditHtml(html);
+  }
+
+  function getTypeBadge(kind) {
+    const map = {
+      BGE: 'BGE', BGer: 'BGr', Monographie: 'M', Kommentar: 'K',
+      Zeitschrift: 'Z', Dissertation: 'D', 'Gesetz/Erlass': '§',
+      Sammelband: 'SB', Kantonal: 'Kt', Internet: 'W', Materialien: 'Mat',
+    };
+    return map[kind] || '?';
+  }
+
+  function useAppData() {
+    const [, setTick] = React.useState(0);
+    React.useEffect(() => {
+      const refresh = () => setTick((t) => t + 1);
+      window.addEventListener(DATA_EVENT, refresh);
+      return () => window.removeEventListener(DATA_EVENT, refresh);
+    }, []);
+
+    const goal = getGoal();
+    return {
+      sources: bridgeSources(window.savedCitations),
+      project: bridgeProject(window.projectMeta || {}, goal),
+      goal,
+    };
+  }
+
+  function QuellenA({ sources, project }) {
+    const [subTab, setSubTab] = React.useState('Literatur');
+    const [filterKind, setFilterKind] = React.useState(null);
+    const [query, setQuery] = React.useState('');
+    const [draft, setDraft] = React.useState(project);
+    const [auditHtml, setAuditHtml] = React.useState('');
+
+    React.useEffect(() => {
+      setDraft(project);
+      syncProjectDraftToLegacy(project);
+    }, [project]);
+
+    const subtabs = [
+      { id: 'Literatur', icon: '📖', label: 'Literaturverzeichnis', kinds: ['Monographie', 'Zeitschrift', 'Kommentar', 'Dissertation', 'Sammelband'] },
+      { id: 'Judikatur', icon: '⚖️', label: 'Judikaturverzeichnis', kinds: ['BGE', 'BGer', 'Kantonal'] },
+      { id: 'Material', icon: '📜', label: 'Materialien', kinds: ['Gesetz/Erlass', 'Materialien'] },
+      { id: 'Abk', icon: '🔤', label: 'Abkürzungen', kinds: [] },
+    ];
+
+    const activeSub = subtabs.find((s) => s.id === subTab) || subtabs[0];
+
+    const counts = React.useMemo(() => {
+      const next = {};
+      sources.forEach((s) => { next[s.kind] = (next[s.kind] || 0) + 1; });
+      return next;
+    }, [sources]);
+
+    const visible = React.useMemo(() => {
+      let list = activeSub.kinds.length === 0
+        ? sources
+        : sources.filter((s) => activeSub.kinds.includes(s.kind));
+      if (filterKind) list = list.filter((s) => s.kind === filterKind);
+      if (query.trim()) {
+        const q = query.trim().toLowerCase();
+        list = list.filter((s) =>
+          s.title.toLowerCase().includes(q) ||
+          s.cite.toLowerCase().includes(q) ||
+          s.author.toLowerCase().includes(q)
+        );
+      }
+      return list;
+    }, [activeSub.kinds, filterKind, query, sources]);
+
+    const pct = Math.min(100, Math.round((sources.length / (project.targetSources || 30)) * 100));
+
+    function updateDraft(field, value) {
+      const next = { ...draft, [field]: value };
+      if (field === 'dueRaw') next.due = formatDue(value);
+      setDraft(next);
+      syncProjectDraftToLegacy(next);
+    }
+
+    function saveDraft() {
+      syncProjectDraftToLegacy(draft);
+      if (window.saveProjectMeta) window.saveProjectMeta();
+    }
+
+    return (
+      <div className="lxr-app">
+        <div className="page">
+          <div className="page-head">
+            <div>
+              <h1 className="page-title">
+                Quellen{' '}
+                <em>
+                  <span style={{ fontSize: 22, color: 'var(--muted)', fontStyle: 'normal', marginLeft: 8 }}>
+                    {sources.length} gesammelt
+                  </span>
+                </em>
+              </h1>
+              <p className="page-sub">Literatur, Judikatur und Materialien für dein aktuelles Projekt.</p>
+            </div>
+          </div>
+
+          <div className="qa-layout">
+            <div>
+              <div className="qa-toolbar">
+                <div className="qa-search">
+                  <span>🔍</span>
+                  <input
+                    placeholder="Suche Titel, Autor, Fundstelle …"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+                <button
+                  onClick={() => { if (window.switchPage) window.switchPage('zitieren'); }}
+                  style={{ all: 'unset', cursor: 'pointer', padding: '10px 18px', background: 'var(--ink)', color: 'var(--bg-card)', borderRadius: 999, fontSize: 13, fontWeight: 500 }}
+                >
+                  ＋ Quelle
+                </button>
+              </div>
+
+              <div className="qa-filters">
+                {CATEGORY_ORDER.map((k) => (
+                  <button
+                    key={k}
+                    className={'qa-chip ' + (filterKind === k ? 'on' : '')}
+                    onClick={() => setFilterKind(filterKind === k ? null : k)}
+                  >
+                    <span className="dot" style={{ background: CATEGORY_COLORS[k] }}></span>
+                    {k}
+                    <span className="count">{counts[k] || 0}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="qa-subtabs">
+                {subtabs.map((s) => {
+                  const total = s.kinds.reduce((acc, kind) => acc + (counts[kind] || 0), 0);
+                  return (
+                    <button
+                      key={s.id}
+                      className={'qa-subtab ' + (subTab === s.id ? 'active' : '')}
+                      onClick={() => {
+                        setSubTab(s.id);
+                        setFilterKind(null);
+                      }}
+                    >
+                      <span>{s.icon}</span>{s.label}
+                      {s.kinds.length > 0 && <span className="sub-count">{total}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="ql-grid">
+                {visible.length === 0 ? (
+                  <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--muted)' }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>📚</div>
+                    <div style={{ fontFamily: 'var(--font-serif)', fontSize: 18, color: 'var(--bordeaux-ink)', marginBottom: 6 }}>
+                      {sources.length === 0 ? 'Noch keine Quellen' : 'Keine Treffer'}
+                    </div>
+                    <div style={{ fontSize: 13 }}>
+                      {sources.length === 0
+                        ? 'Speichere eine Quelle im Zitieren-Tab — sie landet sofort hier.'
+                        : 'Suchbegriff oder Filter anpassen.'}
+                    </div>
+                  </div>
+                ) : visible.map((s) => (
+                  <div key={s.id} className="ql-item">
+                    <span className="ql-type" style={{ background: s.color }}>{getTypeBadge(s.kind)}</span>
+                    <div style={{ overflow: 'hidden' }}>
+                      <div className="ql-title">{s.title}</div>
+                      <div className="ql-cite">{s.cite}</div>
+                    </div>
+                    <div className="ql-meta">
+                      <span>{s.author}</span>
+                      <span>{s.year}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <aside className="qa-rail">
+              <div className="proj-card">
+                <div className="label-caps" style={{ marginBottom: 4 }}>Projekt · Arbeitskontext</div>
+                <h3>{draft.name || 'Mein Projekt'}</h3>
+                <div className="proj-meta">
+                  {draft.module ? <>{draft.module} · </> : null}
+                  Abgabe {draft.due}
+                </div>
+
+                <div className="proj-field">
+                  <label>Projekt / Arbeit</label>
+                  <input value={draft.name} onChange={(e) => updateDraft('name', e.target.value)} />
+                </div>
+                <div className="proj-field">
+                  <label>Modul / Kurs</label>
+                  <input value={draft.module} onChange={(e) => updateDraft('module', e.target.value)} />
+                </div>
+                <div className="proj-field">
+                  <label>Abgabedatum</label>
+                  <input type="date" value={draft.dueRaw || ''} onChange={(e) => updateDraft('dueRaw', e.target.value)} />
+                </div>
+                <div className="proj-field">
+                  <label>Projekt-Notizen</label>
+                  <textarea value={draft.notes} onChange={(e) => updateDraft('notes', e.target.value)} />
+                </div>
+
+                <div className="proj-progress">
+                  <div className="pp-row">
+                    <span>Quellen gesammelt</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{sources.length} / {project.targetSources}</span>
+                  </div>
+                  <div className="pp-bar">
+                    <span style={{ width: pct + '%' }}></span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                  <button
+                    onClick={saveDraft}
+                    style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '10px', background: 'var(--pink-accent)', color: 'var(--bordeaux-ink)', borderRadius: 8, fontSize: 13, fontWeight: 600 }}
+                  >
+                    Projekt speichern
+                  </button>
+                  <button
+                    onClick={() => { if (window.switchPage) window.switchPage('zitieren'); }}
+                    style={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center', padding: '10px', background: 'var(--ink)', color: 'var(--bg-card)', borderRadius: 8, fontSize: 13, fontWeight: 500 }}
+                  >
+                    Zitieren →
+                  </button>
+                </div>
+              </div>
+
+              <div className="util-card" onClick={() => runAuditAndRead(setAuditHtml)}>
+                <span className="util-icon">⚗</span>
+                <div className="util-meta">
+                  <span className="util-tag">Fortgeschritten</span>
+                  <h4>Konsistenz-Check</h4>
+                  <p>Dubletten, fehlende Details und Inkonsistenzen prüfen.</p>
+                </div>
+              </div>
+
+              <div className="util-card" onClick={() => { if (window.exportWorkspaceBackup) window.exportWorkspaceBackup(); }}>
+                <span className="util-icon" style={{ background: 'var(--peach)' }}>🛡</span>
+                <div className="util-meta">
+                  <span className="util-tag">Utility</span>
+                  <h4>Backup & Import</h4>
+                  <p>Quellen, Abkürzungen und Projektdaten als JSON sichern.</p>
+                </div>
+              </div>
+
+              {auditHtml ? (
+                <div className="proj-card">
+                  <div className="label-caps" style={{ marginBottom: 8 }}>Audit-Ergebnis</div>
+                  <div className="consistency-result" style={{ display: 'block' }} dangerouslySetInnerHTML={{ __html: auditHtml }} />
+                </div>
+              ) : null}
+            </aside>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function QuellenB({ sources, project }) {
+    const [activeCat, setActiveCat] = React.useState(null);
+    const [selected, setSelected] = React.useState(sources[0] || null);
+    const [auditHtml, setAuditHtml] = React.useState('');
+
+    React.useEffect(() => {
+      setSelected((prev) => {
+        if (!prev) return sources[0] || null;
+        const stillExists = sources.find((s) => s.id === prev.id);
+        return stillExists || sources[0] || null;
+      });
+    }, [sources]);
+
+    const counts = React.useMemo(() => {
+      const next = {};
+      sources.forEach((s) => { next[s.kind] = (next[s.kind] || 0) + 1; });
+      return next;
+    }, [sources]);
+
+    const visible = React.useMemo(() =>
+      activeCat ? sources.filter((s) => s.kind === activeCat) : sources,
+    [activeCat, sources]);
+
+    const pct = Math.min(100, Math.round((sources.length / (project.targetSources || 30)) * 100));
+    const days = daysLeft(project.dueRaw);
+
+    function handleDelete(source) {
+      if (window.confirm('Quelle löschen?') && window.deleteSavedCitation) {
+        window.deleteSavedCitation(source._raw.id);
+        setSelected(null);
+      }
+    }
+
+    return (
+      <div className="lxr-app">
+        <div className="page">
+          <div className="page-head">
+            <div>
+              <h1 className="page-title">Werkstatt <em>— deine Quellen</em></h1>
+              <p className="page-sub">Jede Quelle ist eine Karte. Sortiere, kommentiere, verknüpfe — alles an einem Ort.</p>
+            </div>
+          </div>
+
+          <div className="qb-workspace">
+            <div className="qb-left">
+              <div className="qb-projbar">
+                <div className="qb-pchip">Projekt · {project.module ? project.module.split(' ')[0] : 'Aktuell'}</div>
+                <h3>{project.name}</h3>
+                <div className="qb-pmodule">Abgabe {project.due}</div>
+                <div className="qb-pring-row">
+                  <div className="qb-pring" style={{ '--p': pct }}>
+                    <span>{pct}%</span>
+                  </div>
+                  <div className="qb-pdays">
+                    <strong>{days !== null ? days + ' Tage' : '—'}</strong>
+                    bis zur Abgabe<br />
+                    {sources.length} von {project.targetSources} Quellen
+                  </div>
+                </div>
+              </div>
+
+              <div className="qb-cat-list">
+                <div className="qb-cat-head">Quellentyp</div>
+                <div className={'qb-cat ' + (activeCat === null ? 'active' : '')} onClick={() => setActiveCat(null)}>
+                  <span className="cat-dot" style={{ background: 'var(--bordeaux)' }}></span>
+                  <span className="cat-name">Alle Quellen</span>
+                  <span className="cat-count">{sources.length}</span>
+                </div>
+                {CATEGORY_ORDER.map((k) => (
+                  <div
+                    key={k}
+                    className={'qb-cat ' + (activeCat === k ? 'active' : '')}
+                    onClick={() => setActiveCat(activeCat === k ? null : k)}
+                  >
+                    <span className="cat-dot" style={{ background: CATEGORY_COLORS[k] }}></span>
+                    <span className="cat-name">{k}</span>
+                    <span className="cat-count">{counts[k] || 0}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="qb-capture">
+                <label>Schnell-Notiz</label>
+                <textarea placeholder="z.B. BGE 144 III 88 zur Aufklärungspflicht …" />
+                <div className="qb-capture-foot">
+                  <span className="hint">Notiz für dich</span>
+                  <button onClick={() => { if (window.switchPage) window.switchPage('zitieren'); }}>
+                    Zitieren →
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="qb-center">
+              <div className="qb-center-head">
+                <div>
+                  <h4>{activeCat || 'Alle Karten'}</h4>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{visible.length} Zettel</div>
+                </div>
+                <div className="hand-anno">≈ Zettelkasten</div>
+              </div>
+
+              {sources.length === 0 ? (
+                <div style={{ position: 'relative', padding: '80px 20px', textAlign: 'center', color: 'var(--muted)' }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>🗂</div>
+                  <div style={{ fontFamily: 'var(--font-serif)', fontSize: 22, color: 'var(--bordeaux-ink)', marginBottom: 8 }}>Leerer Kasten</div>
+                  <div style={{ fontSize: 13, maxWidth: 300, margin: '0 auto' }}>
+                    Beginne im Zitieren-Tab — jede gespeicherte Quelle landet hier als Zettel.
+                  </div>
+                </div>
+              ) : (
+                <div className="qb-zettel-grid">
+                  {visible.map((s, i) => (
+                    <div
+                      key={s.id}
+                      className="qb-zettel"
+                      data-kind={s.kind}
+                      onClick={() => setSelected(s)}
+                      style={{ outline: selected?.id === s.id ? '2px solid var(--bordeaux)' : 'none' }}
+                    >
+                      <div className="z-id">
+                        <span className="z-kind">{s.kind}</span>
+                        <span>#{String(i + 1).padStart(3, '0')}</span>
+                      </div>
+                      <div className="z-title">{s.title}</div>
+                      <div className="z-cite">{s.cite}</div>
+                      <div className="z-foot">
+                        <span className="z-used">{s.year || s._raw?.date || '—'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="qb-right">
+              {selected ? (
+                <div className="qb-inspector">
+                  <div className="qb-insp-head">
+                    <div>
+                      <div className="qb-insp-kind" style={{ color: selected.color }}>
+                        <span className="dot" style={{ background: selected.color }}></span>
+                        {selected.kind}
+                      </div>
+                      <h5>{selected.title}</h5>
+                    </div>
+                  </div>
+                  <div className="qb-insp-body">
+                    <dl>
+                      <dt>Fundstelle</dt>
+                      <dd><span className="link">{selected.cite}</span></dd>
+                      <dt>Autor</dt>
+                      <dd>{selected.author}</dd>
+                      <dt>Jahr</dt>
+                      <dd>{selected.year || '—'}</dd>
+                      <dt>Gespeichert</dt>
+                      <dd>{selected._raw?.date || '—'}</dd>
+                    </dl>
+                    {selected._raw?.kurzText ? (
+                      <div className="qb-insp-refs">
+                        <h6>Kurzangabe (Fussnote)</h6>
+                        <div style={{ color: 'var(--ink-2)', fontStyle: 'italic', fontFamily: 'var(--font-serif)', fontSize: 12 }}>
+                          {selected._raw.kurzText}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="qb-insp-actions">
+                    <button
+                      onClick={() => handleDelete(selected)}
+                      style={{ flex: '0 0 auto', paddingInline: 10, background: 'var(--bg-inset)' }}
+                    >
+                      Löschen
+                    </button>
+                    <button onClick={() => { if (window.openEditModal) window.openEditModal(selected._raw.id); }}>
+                      Bearbeiten
+                    </button>
+                    <button className="primary" onClick={() => { if (window.switchPage) window.switchPage('zitieren'); }}>
+                      Zitieren →
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="qb-inspector" style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>👈</div>
+                  <div style={{ fontFamily: 'var(--font-serif)', fontSize: 15, color: 'var(--bordeaux-ink)' }}>Karte anklicken</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>Details erscheinen hier.</div>
+                </div>
+              )}
+
+              <div className="util-card" onClick={() => runAuditAndRead(setAuditHtml)}>
+                <span className="util-icon">⚗</span>
+                <div className="util-meta">
+                  <span className="util-tag">Fortgeschritten</span>
+                  <h4>Konsistenz-Check</h4>
+                  <p>Dubletten und fehlende Details prüfen.</p>
+                </div>
+              </div>
+
+              {auditHtml ? (
+                <div className="qb-inspector">
+                  <div className="qb-insp-head">
+                    <div>
+                      <div className="qb-insp-kind" style={{ color: 'var(--bordeaux)' }}>
+                        <span className="dot" style={{ background: 'var(--bordeaux)' }}></span>
+                        Audit-Ergebnis
+                      </div>
+                      <h5>Konsistenz-Check</h5>
+                    </div>
+                  </div>
+                  <div className="consistency-result" style={{ display: 'block' }} dangerouslySetInnerHTML={{ __html: auditHtml }} />
+                </div>
+              ) : null}
+
+              <div className="combo-hint">
+                <span className="arrow">↗</span>
+                <span>Jede neue Quelle wächst automatisch im <strong style={{ color: 'var(--bordeaux)' }}>Tracker</strong>.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function TrackerA({ sources, project, goal }) {
+    const total = sources.length;
+    const pct = Math.min(100, Math.round((total / goal) * 100));
+    const days = daysLeft(project.dueRaw);
+
+    const breakdown = React.useMemo(() => CATEGORY_ORDER.map((k) => {
+      const have = sources.filter((s) => s.kind === k).length;
+      const target = CATEGORY_TARGETS[k];
+      return {
+        kind: k,
+        color: CATEGORY_COLORS[k],
+        have,
+        target,
+        pct: Math.min(100, target > 0 ? (have / target) * 100 : 0),
+      };
+    }), [sources]);
+
+    return (
+      <div className="lxr-app">
+        <div className="page">
+          <div className="page-head">
+            <div>
+              <h1 className="page-title">Tracker <em>— Sammelfortschritt</em></h1>
+              <p className="page-sub">Wie weit ist deine Quellensammlung? Behalte den Überblick bis zur Abgabe.</p>
+            </div>
+          </div>
+
+          <div className="ta-layout">
+            <div className="ta-summary">
+              <div className="ta-headrow">
+                <div>
+                  <h3>Gesamtfortschritt</h3>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                    {days !== null ? `${days} Tage bis Abgabe · ` : ''}bis {project.due}
+                  </div>
+                </div>
+                <div className="ta-goal-box">
+                  <span>Ziel</span>
+                  <button className="goal-step" onClick={() => changeGoal(-1, goal)}>−</button>
+                  <span className="goal-val">{goal}</span>
+                  <button className="goal-step" onClick={() => changeGoal(1, goal)}>＋</button>
+                </div>
+              </div>
+
+              <div className="ta-bigbar">
+                <div className="ta-bignum">
+                  <span className="n">{total}</span>
+                  <span className="d">/ {goal}</span>
+                  <span className="u">{pct}% erreicht</span>
+                </div>
+                <div className="ta-progress">
+                  <div className="fill" style={{ width: pct + '%' }}></div>
+                  <div className="marker" data-label="Min. 10" style={{ left: Math.min(98, (10 / goal) * 100) + '%' }}></div>
+                  <div className="marker" data-label="Solide 20" style={{ left: Math.min(98, (20 / goal) * 100) + '%' }}></div>
+                </div>
+              </div>
+
+              <div className="ta-milestones">
+                <div className={'ta-ms ' + (total >= 10 ? 'ok' : '')}>
+                  <div className="t">Etappe I · Grundbestand</div>
+                  <div className="v">10 Quellen</div>
+                </div>
+                <div className={'ta-ms ' + (total >= 20 ? 'ok' : '')}>
+                  <div className="t">Etappe II · solide</div>
+                  <div className="v">20 Quellen</div>
+                </div>
+                <div className={'ta-ms ' + (total >= goal ? 'ok' : '')}>
+                  <div className="t">Etappe III · vollständig</div>
+                  <div className="v">{goal} Quellen</div>
+                </div>
+              </div>
+
+              <div className="combo-hint" style={{ marginTop: 24 }}>
+                <span className="arrow">↻</span>
+                <span>Jede gespeicherte Quelle aus dem <strong style={{ color: 'var(--bordeaux)' }}>Quellen-Tab</strong> wird hier verbucht.</span>
+              </div>
+            </div>
+
+            <div className="ta-breakdown">
+              <h4>Aufschlüsselung <span>nach Typ</span></h4>
+              {breakdown.map((b) => (
+                <div key={b.kind} className="ta-brow">
+                  <span className="dot" style={{ background: b.color }}></span>
+                  <span className="name">{b.kind}</span>
+                  <div className="minibar">
+                    <span style={{ width: b.pct + '%', background: b.color }}></span>
+                  </div>
+                  <span className="count">{b.have}/{b.target}</span>
+                  <span className={'delta ' + (b.have === 0 ? 'zero' : '')}>
+                    {b.have === 0 ? '—' : '✓'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function Constellation({ sources }) {
+    const W = 720;
+    const H = 280;
+    const cats = CATEGORY_ORDER;
+    const angleStep = (Math.PI * 2) / cats.length;
+    const cx = W / 2;
+    const cy = H / 2;
+    const radius = 95;
+
+    const positions = React.useMemo(() => {
+      const grouped = {};
+      sources.forEach((s) => {
+        if (!grouped[s.kind]) grouped[s.kind] = [];
+        grouped[s.kind].push(s);
+      });
+      return sources.reduce((acc, s) => {
+        const catIdx = cats.indexOf(s.kind);
+        if (catIdx === -1) return acc;
+        const sameCat = grouped[s.kind] || [];
+        const subIdx = sameCat.findIndex((entry) => entry.id === s.id);
+        const subTotal = sameCat.length;
+        const baseA = catIdx * angleStep - Math.PI / 2;
+        const aOffset = (subIdx - (subTotal - 1) / 2) * 0.22;
+        const r = radius + (subIdx % 2) * 16;
+        acc.push({
+          x: cx + Math.cos(baseA + aOffset) * r,
+          y: cy + Math.sin(baseA + aOffset) * r,
+          s,
+        });
+        return acc;
+      }, []);
+    }, [sources]);
+
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
+        <circle cx={cx} cy={cy} r={28} fill="var(--bordeaux-ink)" />
+        <text x={cx} y={cy - 2} textAnchor="middle" fontFamily="var(--font-serif)" fontSize="11" fill="var(--peach)">Projekt</text>
+        <text x={cx} y={cy + 12} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="9" fill="rgba(245,212,184,.7)">{sources.length}</text>
+
+        {cats.map((k, i) => {
+          const a = i * angleStep - Math.PI / 2;
+          return (
+            <g key={k}>
+              <line
+                x1={cx}
+                y1={cy}
+                x2={cx + Math.cos(a) * radius}
+                y2={cy + Math.sin(a) * radius}
+                stroke="var(--border-soft)"
+                strokeDasharray="2 3"
+              />
+              <text
+                x={cx + Math.cos(a) * (radius + 30)}
+                y={cy + Math.sin(a) * (radius + 30) + 3}
+                textAnchor="middle"
+                fontSize="9"
+                fontFamily="var(--font-sans)"
+                fill="var(--muted)"
+              >
+                {k.length > 10 ? k.slice(0, 8) + '…' : k}
+              </text>
+            </g>
+          );
+        })}
+
+        {positions.map(({ x, y, s }) => (
+          <g key={s.id}>
+            <line x1={cx} y1={cy} x2={x} y2={y} stroke={s.color} strokeOpacity="0.18" strokeWidth="1" />
+            <circle cx={x} cy={y} r={5} fill={s.color} stroke="var(--bg-card)" strokeWidth="1.5">
+              <title>{s.title}</title>
+            </circle>
+          </g>
+        ))}
+      </svg>
+    );
+  }
+
+  function TrackerB({ sources, project, goal }) {
+    const total = sources.length;
+    const pct = Math.min(100, Math.round((total / goal) * 100));
+    const days = daysLeft(project.dueRaw);
+
+    const heatmap = React.useMemo(() => {
+      const cells = new Array(56).fill(0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      sources.forEach((s) => {
+        const d = parseCitationDate(s._raw?.date);
+        if (!d) return;
+        d.setHours(0, 0, 0, 0);
+        const diff = Math.floor((today.getTime() - d.getTime()) / 86400000);
+        if (diff >= 0 && diff < 56) cells[55 - diff] += 1;
+      });
+      return cells.map((value) => Math.min(4, value));
+    }, [sources]);
+
+    const stacks = React.useMemo(() => CATEGORY_ORDER.map((k) => {
+      const have = sources.filter((s) => s.kind === k).length;
+      const target = CATEGORY_TARGETS[k];
+      const books = [];
+      for (let i = 0; i < Math.max(target, have); i += 1) {
+        books.push({ has: i < have, h: 30 + ((i * 13) % 28) });
+      }
+      return { kind: k, color: CATEGORY_COLORS[k], have, target, books };
+    }), [sources]);
+
+    return (
+      <div className="lxr-app">
+        <div className="page">
+          <div className="page-head">
+            <div>
+              <h1 className="page-title">Sammlung <em>im Werden</em></h1>
+              <p className="page-sub">Deine Quellen als lebende Konstellation. Grössere Punkte = häufiger zitiert.</p>
+            </div>
+          </div>
+
+          <div className="tb-layout">
+            <div className="tb-shelf">
+              <div className="tb-head">
+                <div>
+                  <h3>Konstellation</h3>
+                  <div className="sub">Jeder Punkt ist eine Quelle — nach Typ gruppiert.</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontFamily: 'var(--font-serif)', fontSize: 32, color: 'var(--bordeaux-ink)', lineHeight: 1 }}>{total}</div>
+                  <div style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Quellen total</div>
+                </div>
+              </div>
+
+              <div className="tb-const">
+                <div className="legend">Konstellation · {total} / {goal}</div>
+                <div className="qnum"><strong>{pct}%</strong> Sammlung</div>
+                {total === 0 ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontStyle: 'italic', fontFamily: 'var(--font-serif)', fontSize: 16 }}>
+                    Sobald du deine erste Quelle speicherst, leuchtet hier ein Stern auf ✦
+                  </div>
+                ) : (
+                  <Constellation sources={sources} />
+                )}
+              </div>
+
+              <div className="tb-stacks">
+                {stacks.map((st) => (
+                  <div key={st.kind} className="tb-stack">
+                    <div className="sk-head">
+                      <span className="sk-dot" style={{ background: st.color }}></span>
+                      <span className="sk-name">{st.kind}</span>
+                    </div>
+                    <div className="sk-books">
+                      {st.books.map((b, i) => (
+                        <div
+                          key={i}
+                          className={'book' + (b.has ? '' : ' empty')}
+                          style={{
+                            height: b.has ? b.h + '%' : '30%',
+                            background: b.has ? st.color : undefined,
+                            animationDelay: (i * 0.04) + 's',
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <div className="sk-foot">
+                      <span className="n">
+                        {st.have}
+                        <span style={{ fontSize: 12, color: 'var(--muted)' }}>/ {st.target}</span>
+                      </span>
+                      <span className="d">
+                        {st.have >= st.target ? '✓ voll' : st.have === 0 ? 'leer' : 'lückig'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="tb-rail">
+              <div className="tb-goal-card">
+                <div className="tg-label">Sammelziel</div>
+                <div style={{ fontFamily: 'var(--font-serif)', fontSize: 18, lineHeight: 1.2 }}>
+                  Bis {project.due} werden es <em style={{ color: 'var(--peach)' }}>{goal}</em>.
+                </div>
+                <div className="tg-ring-wrap">
+                  <div className="tg-ring" style={{ '--p': pct }}>
+                    <div className="tg-ring-inner">
+                      <div className="p">{pct}%</div>
+                      <div className="s">{total} / {goal}</div>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 10 }}>
+                  <button
+                    onClick={() => changeGoal(-1, goal)}
+                    style={{ all: 'unset', cursor: 'pointer', padding: '4px 12px', border: '1px solid rgba(245,212,184,.3)', borderRadius: 6, color: 'var(--peach)', fontSize: 13 }}
+                  >
+                    −
+                  </button>
+                  <span style={{ color: 'rgba(255,250,239,.7)', fontSize: 12, alignSelf: 'center' }}>Ziel: {goal}</span>
+                  <button
+                    onClick={() => changeGoal(1, goal)}
+                    style={{ all: 'unset', cursor: 'pointer', padding: '4px 12px', border: '1px solid rgba(245,212,184,.3)', borderRadius: 6, color: 'var(--peach)', fontSize: 13 }}
+                  >
+                    ＋
+                  </button>
+                </div>
+                <div className="tg-stats">
+                  <div className="tg-stat">
+                    <div className="v">{days !== null ? days : '—'}</div>
+                    <div className="k">Tage offen</div>
+                  </div>
+                  <div className="tg-stat">
+                    <div className="v">{goal - total > 0 ? goal - total : 0}</div>
+                    <div className="k">noch fehlen</div>
+                  </div>
+                  <div className="tg-stat">
+                    <div className="v">{total}</div>
+                    <div className="k">gesammelt</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="tb-activity">
+                <h5>Aktivität <span>letzte 8 Wochen</span></h5>
+                <div className="tb-heatmap">
+                  {heatmap.map((level, index) => (
+                    <div key={index} className="cell" data-l={level}></div>
+                  ))}
+                </div>
+                <div className="tb-scale">
+                  <span>weniger</span>
+                  <span className="c" style={{ background: 'var(--bg-inset)' }}></span>
+                  <span className="c" style={{ background: '#f0dcdb' }}></span>
+                  <span className="c" style={{ background: '#d98a8a' }}></span>
+                  <span className="c" style={{ background: '#8e3440' }}></span>
+                  <span className="c" style={{ background: '#4a1520' }}></span>
+                  <span>mehr</span>
+                </div>
+              </div>
+
+              <div className="combo-hint">
+                <span className="arrow">↺</span>
+                <span>Lücken sehen → im <strong style={{ color: 'var(--bordeaux)' }}>Quellen-Tab</strong> gezielt ergänzen.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function QuellenPage() {
+    const [variant, setVariant] = React.useState('B');
+    const { sources, project } = useAppData();
+    return (
+      <div className="lxr-app">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 4px 0' }}>
+          <div className="variant-pill">
+            Design-Variante
+            <div className="seg">
+              <button className={variant === 'A' ? 'on' : ''} onClick={() => setVariant('A')}>A Liste</button>
+              <button className={variant === 'B' ? 'on' : ''} onClick={() => setVariant('B')}>B Zettel</button>
+            </div>
+          </div>
+        </div>
+        {variant === 'A'
+          ? <QuellenA sources={sources} project={project} />
+          : <QuellenB sources={sources} project={project} />}
+      </div>
+    );
+  }
+
+  function TrackerPage() {
+    const [variant, setVariant] = React.useState('B');
+    const { sources, project, goal } = useAppData();
+
+    React.useEffect(() => {
+      const goalInput = document.getElementById('goalInput');
+      if (goalInput && String(goalInput.value) !== String(goal)) {
+        goalInput.value = String(goal);
+        if (window.updateTrackerDisplay) window.updateTrackerDisplay();
+      }
+    }, [goal]);
+
+    return (
+      <div className="lxr-app">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 4px 0' }}>
+          <div className="variant-pill">
+            Design-Variante
+            <div className="seg">
+              <button className={variant === 'A' ? 'on' : ''} onClick={() => setVariant('A')}>A Übersicht</button>
+              <button className={variant === 'B' ? 'on' : ''} onClick={() => setVariant('B')}>B Sammlung</button>
+            </div>
+          </div>
+        </div>
+        {variant === 'A'
+          ? <TrackerA sources={sources} project={project} goal={goal} />
+          : <TrackerB sources={sources} project={project} goal={goal} />}
+      </div>
+    );
+  }
+
+  const quellenRoot = document.getElementById('lxr-quellen-root');
+  if (quellenRoot) ReactDOM.createRoot(quellenRoot).render(<QuellenPage />);
+
+  const trackerRoot = document.getElementById('lxr-tracker-root');
+  if (trackerRoot) ReactDOM.createRoot(trackerRoot).render(<TrackerPage />);
+})();
 </script>
 </body>
 </html>
