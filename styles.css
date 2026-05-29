@@ -5939,3 +5939,136 @@ body.dark .hero-demo-workbench .hero-demo-icon-btn:hover {
   display: inline-block;
 }
 .d-controls .dots i.on { background: var(--accent); }
+
+body.dark .lexcite-demo {
+  --bg: #17130f;
+  --bg-2: #1d1813;
+  --paper: #221c17;
+  --ink: #f4ede2;
+  --ink-2: #ddcfbf;
+  --ink-3: #b9aa99;
+  --hairline: rgba(112, 96, 81, 0.88);
+  --hairline-2: rgba(82, 69, 58, 0.82);
+  --accent: #cda3a0;
+  --accent-2: #dfb7b3;
+  --accent-bg: rgba(205, 163, 160, 0.16);
+  --good: #8fbf95;
+  --hl-court: rgba(138, 43, 43, 0.20);
+  --hl-num: rgba(190, 150, 75, 0.20);
+  --hl-date: rgba(87, 132, 171, 0.18);
+  --ink-court: #f0c3bf;
+  --ink-num: #e8d097;
+  --ink-date: #bdd8ef;
+  border-color: rgba(88, 76, 64, 0.86);
+  background: linear-gradient(180deg, #241e18, #17130f);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 248, 237, 0.05),
+    0 30px 60px -30px rgba(0, 0, 0, 0.42),
+    0 10px 30px -12px rgba(0, 0, 0, 0.28);
+}
+
+body.dark .lx-chrome {
+  background: linear-gradient(to bottom, rgba(43, 35, 28, 0.96), rgba(31, 25, 20, 0.98));
+  border-bottom-color: var(--hairline-2);
+}
+
+body.dark #demo-root {
+  background: var(--paper, #221c17);
+}
+
+body.dark .d-left {
+  background:
+    radial-gradient(600px 300px at 20% 0%, rgba(205, 163, 160, 0.08), transparent 60%),
+    var(--paper);
+  border-right-color: var(--hairline-2);
+}
+
+body.dark .d-right {
+  background: linear-gradient(180deg, #1b1611, #15110d);
+}
+
+body.dark .d-rail .node.active {
+  color: var(--ink);
+}
+
+body.dark .d-rail .node.done .dot {
+  background: #2f5d3a;
+  border-color: #8fbf95;
+  color: #f4ede2;
+}
+
+body.dark .d-pdf {
+  background: linear-gradient(180deg, #2a231d, #221c17);
+  border-color: var(--hairline);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 248, 237, 0.05),
+    0 8px 24px -16px rgba(0, 0, 0, 0.42);
+  color: var(--ink-2);
+}
+
+body.dark .d-pdf-head {
+  border-bottom-color: var(--hairline-2);
+}
+
+body.dark .tok.on-court { background: rgba(138, 43, 43, 0.24); }
+body.dark .tok.on-num { background: rgba(190, 150, 75, 0.22); }
+body.dark .tok.on-date { background: rgba(87, 132, 171, 0.22); }
+
+body.dark .d-tok-card {
+  background: linear-gradient(180deg, #2b241e, #231d18);
+  border-color: var(--hairline);
+}
+
+body.dark .d-cite {
+  background: linear-gradient(to bottom, #2b241e, #231d18);
+  border-color: var(--hairline);
+}
+
+body.dark .d-cite.focus {
+  background: linear-gradient(to bottom, #332923, #261e19);
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 3px rgba(205, 163, 160, 0.12),
+    0 14px 30px -14px rgba(205, 163, 160, 0.20);
+}
+
+body.dark .d-index {
+  background: linear-gradient(180deg, #2a231d, #221c17);
+  border-color: var(--hairline);
+}
+
+body.dark .d-index-head {
+  background: linear-gradient(180deg, #312923, #261f19);
+  border-bottom-color: var(--hairline-2);
+}
+
+body.dark .d-index li {
+  border-bottom-color: var(--hairline-2);
+}
+
+body.dark .d-index li.new {
+  background: rgba(47, 93, 58, 0.26);
+  color: var(--ink);
+}
+
+body.dark .d-fly {
+  background: #2b241e;
+  border-color: var(--accent);
+  color: var(--ink);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.45);
+}
+
+body.dark .d-controls {
+  border-top-color: var(--hairline);
+}
+
+body.dark .d-controls button {
+  background: rgba(34, 28, 23, 0.92);
+  border-color: var(--hairline);
+  color: var(--ink-2);
+}
+
+body.dark .d-controls button:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
